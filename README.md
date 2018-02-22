@@ -122,9 +122,9 @@
  Two produced: 'only-shared' and 'private-shared' per variant-type, and per IMPACT ('HM' -> 'high' + 'moderate'; ALL -> all IMPACTs). Total per run is 4 per variant type.
  Idea was to represent all mutations shared between any samples, and to visualise the extent of variants across all samples. NB samples can be removed by excluding from $INCLUDEDORDER.
  Examples:
- ![only-shared](https://github.com/brucemoran/rescueSomaticVariantCalls/blob/master/images/HM.snv.only-shared.consensus.pdf)
+ [only-shared](https://github.com/brucemoran/rescueSomaticVariantCalls/blob/master/images/HM.snv.only-shared.consensus.pdf)
  NB the shared *PTEN* and *RB1* mutations (common across high-grade ovarian disease) 
- ![private-shared](https://github.com/brucemoran/rescueSomaticVariantCalls/blob/master/images/HM.snv.private-shared.consensus.pdf)
+ [private-shared](https://github.com/brucemoran/rescueSomaticVariantCalls/blob/master/images/HM.snv.private-shared.consensus.pdf)
  NB the extent of mutation in 'Normal' which was taken following 3 cycles of carboplatin, a potent mutagen
 
 **To-do**
