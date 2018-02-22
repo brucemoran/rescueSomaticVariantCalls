@@ -1,11 +1,11 @@
-#rescueSomaticVariantCalls
-##A method for recovering arbitrarily-filtered SNV calls allowing multiple callers
-##(Also makes plots)
+# rescueSomaticVariantCalls
+## A method for recovering arbitrarily-filtered SNV calls allowing multiple callers
+## (Also makes plots)
 
-######How to:
+###### How to:
 
 [[**Required Inputs**]]
--VCFs (at least two or the method is pointless) annotated by VEP90
+- VCFs (at least two or the method is pointless) annotated by VEP90
  Unsure of absolute requirement of version 90, I have not tested outside this
  Flags for succesful below, NB to define those input variables:
  ```
@@ -32,7 +32,7 @@
    --force_overwrite \
    --verbose
  ```
--R libraries
+- R libraries
  Install below, into the .libPath() location that you then give the scripts herein
  As I use PBS, library paths have been an issue so I now set specifically
  ```
@@ -57,7 +57,7 @@
  lapply(cranLibs,install.packages(dependencies=TRUE))
  ```
 
--Variables for R scripts
+- Variables for R scripts
  ```
  LIBPATH = <your R .libPaths() result from above installs> 
  CALLDIR = <directory where your VCFs reside, NB name of this dir is used to tag filenames (best use case: dir named after caller>
@@ -71,7 +71,7 @@
  ```
 
 [[**Running**]]
--Make RData containing GRanges of multiple samples from VEP-annotated and raw VCFs
+- Make RData containing GRanges of multiple samples from VEP-annotated and raw VCFs
  Following variant calling with CallerX which is in directory structure: /data/project/analysis/WGS/calls/CallerX
  ```
  Rscript --vanilla $SCRIPTDIR/vepVCF_to_GRangesRData.caller.R \
@@ -87,7 +87,7 @@
  
  N.B. that the actual format of the RData is a list of GRanges (NOT GRangesList), so access is as per functions herein, read the code to see how it is performed.
 
--Rescue somatic calls, plot
+- Rescue somatic calls, plot
  Directly after the above, run:
  ```
  Rscript --vanilla $SCRIPTDIR/SNV_GRanges_consensus_plot.caller.R \
@@ -100,7 +100,7 @@
  This returns tables of variants per sample (to put in Excel sheets for your colleagues) and plots of shared and shared+private variants. A tumour mutational burden function is also in place, based on Illumina's Rapid Nextera kit. The result is returned within the filename of the samples for the 'ALL' impact outputs.
 
 [[**Output**]]
--RData GRanges objects
+- RData GRanges objects
  Given three samples named Tumour, Recurrence, Metastasis; SNVs called with MuTect2 and Strelka2, you have 12 VCFs as input: Tumour.MuTect2.snv.raw.vcf, Tumour.Strelka2.snv.raw.vcf, Tumour.MuTect2.snv.vep90.vcf, etc. 
  There are four RData made in the first instance by vepVCF_to_GRangesRData.caller.R: MuTect2.snv.raw.RData, MuTect2.snv.vep90.RData, Strelka2.snv.raw.RData, Strelka2.snv.vep90.RData, each is set up internally like this:
  ```
@@ -112,13 +112,13 @@
  Running SNV_GRanges_consensus_plot.caller.R, the first thing that happens is to load the sets of RData for variant types. Then in subsequent functions, these are get()'d and processed.
  Errors will arise if $CALLDIR contains any further RData objects.
 
--Tables
+- Tables
  Header =  seqnames, start, end, width, strand, AD, AD.1, AF, Consequence, IMPACT, SYMBOL, HGVSc, HGVSp, HGVSp1
  AD, AD.1 = Somatic, Germline
  HGVSp, HGVSp1 = 3-letter, 1-letter annotations (3-letter, produced by VEP, is converted to 1-letter internally)
  Rest are self explanatory IMHO
 
--Plots
+- Plots
  Two produced: 'only-shared' and 'private-shared' per variant-type, and per IMPACT ('HM' -> 'high' + 'moderate'; ALL -> all IMPACTs). Total per run is 4 per variant type.
  Idea was to represent all mutations shared between any samples, and to visualise the extent of variants across all samples. NB samples can be removed by excluding from $INCLUDEDORDER.
  Examples:
@@ -128,5 +128,5 @@
  NB the extent of mutation is similar across patients
 
 -To-do
- Scale bar for private-shared to show extent. 
- Print TMB values to private-shared.
+ - [ ] Scale bar for private-shared to show extent. 
+ - [ ] Print TMB values to private-shared.
