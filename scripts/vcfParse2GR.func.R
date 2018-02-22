@@ -1,0 +1,1 @@
+/home/bmoran/scripts/R/functions/GRanges/vcfParse2GR.func.R
