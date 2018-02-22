@@ -4,7 +4,7 @@
 
 ###### How to:
 
-[[**Required Inputs**]]
+[[ **Required Inputs** ]]
 - VCFs (at least two or the method is pointless) annotated by VEP90
  Unsure of absolute requirement of version 90, I have not tested outside this
  Flags for succesful below, NB to define those input variables:
@@ -70,7 +70,7 @@
  INCLUDEDORDER = <string of comma-delimited order in which your samples whould be plotted (heatmap of frequency across samples>
  ```
 
-[[**Running**]]
+[[ **Running** ]]
 - Make RData containing GRanges of multiple samples from VEP-annotated and raw VCFs
  Following variant calling with CallerX which is in directory structure: /data/project/analysis/WGS/calls/CallerX
  ```
@@ -99,7 +99,7 @@
  ```
  This returns tables of variants per sample (to put in Excel sheets for your colleagues) and plots of shared and shared+private variants. A tumour mutational burden function is also in place, based on Illumina's Rapid Nextera kit. The result is returned within the filename of the samples for the 'ALL' impact outputs.
 
-[[**Output**]]
+[[ **Output** ]]
 - RData GRanges objects
  Given three samples named Tumour, Recurrence, Metastasis; SNVs called with MuTect2 and Strelka2, you have 12 VCFs as input: Tumour.MuTect2.snv.raw.vcf, Tumour.Strelka2.snv.raw.vcf, Tumour.MuTect2.snv.vep90.vcf, etc. 
  There are four RData made in the first instance by vepVCF_to_GRangesRData.caller.R: MuTect2.snv.raw.RData, MuTect2.snv.vep90.RData, Strelka2.snv.raw.RData, Strelka2.snv.vep90.RData, each is set up internally like this:
@@ -127,6 +127,6 @@
  ![private-shared](brucemoran.github.com/brucemoran.github.io/images/HM.snv.private-shared.consensus.pdf)
  NB the extent of mutation is similar across patients
 
--To-do
+[[ **To-do** ]]
  - [ ] Scale bar for private-shared to show extent. 
  - [ ] Print TMB values to private-shared.
