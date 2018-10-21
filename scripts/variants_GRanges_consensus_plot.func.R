@@ -177,7 +177,7 @@ atLeastTwo <- function(mutypeList, GRsuper, tag, tmb=NULL, mutypeWant=NULL){
   ##run TMB?
   if(is.null(tmb)){tmb <- "snv"}
   if(is.null(mutypeWant)){mutypeWant <- "snv"}
-  print(paste0("Processing: ",mutypeWant))
+  print(paste0("Processing: ", mutypeWant))
 
   ##iterate over list of mutypes
   mutypes <- names(mutypeList)
@@ -186,7 +186,6 @@ atLeastTwo <- function(mutypeList, GRsuper, tag, tmb=NULL, mutypeWant=NULL){
   GRplots <- lapply(seq_along(mutypeListIn), function(x){
 
     mutype <- names(mutypeListIn)[x]
-    a
     samples <- names(GRsuper[[x]])
     lengGR <- length(GRsuper[[x]])
 
@@ -386,11 +385,11 @@ plotConsensusList <- function(plotList, rawList, tag, includeOrder=includeOrder)
 
 exomeTumourMutationBurden <- function(GRplot){
 
-  ##get exome for Illumina Nextera Rapid
+  ##get exome for Illumina Nextera Rapid (exemplar of exome, not really necessary to use specific one on which data was generated...IMO, please correct if obvious flaw)
   exomeBed <- fread("https://support.illumina.com/content/dam/illumina-support/documents/documentation/chemistry_documentation/samplepreps_nextera/nexterarapidcapture/nexterarapidcapture_exome_targetedregions_v1.2.bed", showProgress=FALSE, data.table=FALSE)
 
   ##triage
-  exomeBed[,1] <- gsub("chr","",exomeBed[,1])
+  exomeBed[,1] <- gsub("chr", "", exomeBed[,1])
   colnames(exomeBed) <- c("seqname", "start", "end")
   exomeGR <- makeGRangesFromDataFrame(exomeBed, ignore.strand=TRUE)
   exomeSize <- sum(width(exomeGR))/1000000
