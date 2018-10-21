@@ -1,4 +1,4 @@
-#! /usr/bin/R
+#! R
 
 ##read VCFs into GrangesList, take overlap based on 'consensus' files (list)
 ##use for plotting

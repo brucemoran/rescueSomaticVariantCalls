@@ -1,4 +1,4 @@
-#! /usr/bin/R
+#! R
 
 ##read VCFs into Granges
 

@@ -1,4 +1,4 @@
-#! /usr/bin/R
+#! R
 
 options(stringAsFactors=FALSE)
 args <- commandArgs(trailingOnly = TRUE)

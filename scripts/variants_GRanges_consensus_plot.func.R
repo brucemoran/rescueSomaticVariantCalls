@@ -1,4 +1,4 @@
-#! /usr/bin/R
+#! R
 
 ##functions for SNV_consensus generation and plotting
 
