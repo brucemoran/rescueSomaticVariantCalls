@@ -246,12 +246,11 @@ atLeastTwo <- function(mutypeList, GRsuper, tag, tmb=NULL, mutypeWant=NULL){
       })
     }
   })
-    names(GRplots) <- mutypes
-    for(x in 1:length(mutypes)){
-      names(GRplots[[mutypes[x]]]) <- names(GRsuper[[x]])
-    }
-    return(GRplots)
-  })
+  names(GRplots) <- mutypes
+  for(x in 1:length(mutypes)){
+    names(GRplots[[mutypes[x]]]) <- names(GRsuper[[x]])
+  }
+  return(GRplots)
 }
 
 ##create two plots: all consensus, those in 2+ samples
