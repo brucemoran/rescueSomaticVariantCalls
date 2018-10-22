@@ -12,7 +12,12 @@ INCLUDEDORDER <- args[3]
 
 ##inputs
 tag <- TAG ##tag
-includeOrder <- strSplitVec(INCLUDEDORDER,",")[,1] ##comma delim args[3]
+if(length(grep(",",INCLUDEDORDER))==0){
+  includeOrder <- INCLUDEDORDER
+}
+if(length(grep(",",INCLUDEDORDER))>0){
+  includeOrder <- strSplitVec(INCLUDEDORDER,",")[,1]
+}
 
 ##load set of RData GRanges, not raw
 print("Loading VEP annotated GRanges")
