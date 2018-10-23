@@ -1,70 +1,150 @@
-#! R
+##script template for vcf consensus variant calls under nextflow;
+##this is the associated R script from sh template, named as per s/\.R/\.sh/
+##NB this takes input of dir, variant type supplied as 'input'
+
+#! /usr/bin/R
+
+##inputs
+##[1] <- RLIBPATH = $R_LIB_PATHS
+##[2] <- functions file
+##[3] <- GERMLINE = ${params.germline}
+##[4] <- VEPVCFPATTERN = $vartype".pass.vep"
+##[5] <- TAG = ${params.runID}
 
 options(stringAsFactors=FALSE)
 args <- commandArgs(trailingOnly = TRUE)
+##if defined, used R_LIB_PATHS
+.libPaths(args[1])
 
-##where to source functions from
-source(args[1])
+source(args[2])
+
+##germline sample ID
+GERMLINE <- args[3]
+
+##VEP vcf pattern
+##raw VCF must be *raw.vcf
+VEPVCFPATTERN <- args[4]
+RAWVCFPATTERN <- "raw.vcf"
 
 ##string to tag output files
-TAG <- args[2]
-INCLUDEDORDER <- args[3]
+TAG <- args[5] -> tag
+#INCLUDEORDER <- strSplitVec(args[5],",")[,1] ##comma delim string
 
-##inputs
-tag <- TAG ##tag
-if(length(grep(",",INCLUDEDORDER))==0){
-  includeOrder <- INCLUDEDORDER
-}
-if(length(grep(",",INCLUDEDORDER))>0){
-  includeOrder <- strSplitVec(INCLUDEDORDER,",")[,1]
+##parse VCFs
+##all should exist in current dir, all output to same dir
+vcfVec <- dir(pattern=VEPVCFPATTERN)
+vcfList <- vcfVec[grep(".vcf$",vcfVec)]
+rawVec <- dir(pattern=RAWVCFPATTERN)
+rawList <- rawVec[grep(".vcf$",rawVec)]
+inputList <- list(vcfList, rawList)
+vcfExt <- gsub("-","_",
+               paste(strSplitVec(
+                              gsub("\\.vcf","",
+                              vcfList[[1]]),
+                              "\\.")[-c(1,2),1],
+                    collapse="."))
+
+##operate over varianttype, raw
+for(x in 1:2){
+  inList <- inputList[[x]]
+  samples <- strSplitVec(inList, "\\.")[1,]
+  callers <- strSplitVec(inList, "\\.")[2,]
+  outExt <- gsub("-","_",
+                 paste(strSplitVec(
+                                gsub("\\.vcf","",
+                                inList[[1]]),
+                                "\\.")[-c(1,2),1],
+                      collapse="."))
+  print(paste0("Working on: ", outExt))
+
+  dirtest <- dir(pattern=paste0(outExt,".RData"))
+  if(length(dirtest)==0){
+
+    ##run function to make list of GRanges per caller
+    grList <- base::as.list(unique(callers))
+    names(grList) <- unique(callers)
+
+    for (callern in 1:length(unique(callers))){
+      caller <- unique(callers)[callern]
+      print(paste0("Caller: ",caller))
+      ##parse VCFs, raw or VEP annotated
+      if(outExt == "raw"){
+        grList[[caller]] <- lapply(inList[grep(caller,callers)],function(f){
+          suppressWarnings(vcfParseGR(f, GERMLINE))
+        })
+      }
+      else{
+        grList[[caller]] <- lapply(inList[grep(caller,callers)],function(f){
+          suppressWarnings(vcfVepAnnParseGR(f, GERMLINE))
+        })
+      }
+      names(grList[[caller]]) <- samples[grep(caller,callers)]
+    }
+
+    dirtest <- dir(pattern=paste0(outExt,".RData"))
+    ##assign output, save to dir
+    assignedName <- paste0(outExt)
+    assign(assignedName, value=grList)
+    saveFile <- paste0(outExt,".RData")
+    save(list=assignedName, file=saveFile)
+  }
+  else{
+    print(paste0("Found: ", outExt, ".RData, this is used"))
+  }
 }
 
 ##load set of RData GRanges, not raw
-print("Loading VEP annotated GRanges")
+print("Loading GRanges")
 dirIn <- dir(pattern=".RData")
-grIn <- dirIn[grep("raw", dirIn, invert=T)]
-loadedGR <- lapply(grIn, function(x){
+#dirIn <- dirIn[grep("raw",dirIn,invert=T)]
+loadedGR <- lapply(dirIn,function(x){
   load(x,envir=.GlobalEnv)
   })
-names(loadedGR) <- loadedGR
-mutypes <- unique(strSplitVec(unlist(loadedGR), "\\.")[2,])
+names(loadedGR) <- unlist(loadedGR)
 
-#load raw GRanges data
-print("Loading raw VCF GRanges")
-grawIn <- dir(pattern="raw.RData")
-loadedGRaw <- lapply(grawIn, function(x){
-  load(x, envir=.GlobalEnv)
-  })
-names(loadedGRaw) <- loadedGRaw
+##set GRnages into lists
+rawList <- get(loadedGR$raw)
+varList <- get(loadedGR[[vcfExt]])
 
-##get set of RData GRanges into list
-mutypeList <- lapply(mutypes, function(f){
-  wantGR <- grep(f, names(loadedGR))
-  lapply(loadedGR[wantGR], function(g){get(g)})
-  })
-names(mutypeList) <- mutypes
-samples <- names(mutypeList[[1]][[1]])
-
-##get raw GRnages into list
-rawList <- lapply(loadedGRaw, function(f){
-  get(f)
-  })
+##callers, samples used
+callers <- names(varList)
+samples <- names(varList[[1]])
 
 ##get GRanges superset per mutype
-GRsuper <- GRsuperSet(mutypeList, impacts=c("HIGH", "MODERATE"))
+GRsuper <- GRsuperSet(varList)
 
 ##get list to plot from
-plotList <- atLeastTwo(mutypeList, GRsuper, paste0(tag, ".HM"))
+plotList <- atLeastTwo(varList, GRsuper, tag=paste0(tag,".",VEPVCFPATTERN,".HM"))
 
 ##plot
-plotConsensusList(plotList, rawList, paste0(tag, ".HM"), includeOrder)
+if(length(plotList)>1){
+  if(length(plotList[[1]])!=0 & length(plotList[[2]])!=0){
+    plotConsensusList(plotList, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".HM"))
+  }
+  if(length(plotList[[1]])!=0 & length(plotList[[2]])!=0){
+    print("No variants returned at HM, support across callers lacking")
+  }
+}
+if(length(plotList)==1){
+  plotConsensusSingle(plotList, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".HM"))
+}
 
 ##run to get all impacts, print but not plot
 ##get GRanges superset per mutype
-GRsuperALL <- GRsuperSet(mutypeList, impacts=c("HIGH", "MODERATE", "MODIFIER", "LOW"))
+GRsuperALL <- GRsuperSet(varList, impacts=c("HIGH","MODERATE","MODIFIER","LOW"))
 
 ##get list to plot from
-plotListAll <- atLeastTwo(mutypeList, GRsuperALL, paste0(tag, ".ALL"), tmb="snv", mutypeWant="snv")
+plotListAll <- atLeastTwo(varList, GRsuperALL, tag=paste0(tag,".",VEPVCFPATTERN,".ALL"), tmb="snv")
 
 ##plot
-plotConsensusList(plotListAll, rawList, paste0(tag, ".ALL"), includeOrder)
+if(length(plotListAll)>1){
+  if(length(plotListAll[[1]])!=0 & length(plotListAll[[2]])!=0){
+    plotConsensusList(plotListAll, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".ALL"))
+  }
+  if(length(plotListAll[[1]])!=0 & length(plotListAll[[2]])!=0){
+    print("No variants returned at ALL, support across callers lacking")
+  }
+}
+if(length(plotListAll)==1){
+  plotConsensusSingle(plotListAll, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".ALL"))
+}
