@@ -5,30 +5,31 @@
 #! /usr/bin/R
 
 ##inputs
-##[1] <- RLIBPATH = $R_LIB_PATHS
-##[2] <- functions file
-##[3] <- GERMLINE = ${params.germline}
-##[4] <- VEPVCFPATTERN = $vartype".pass.vep"
-##[5] <- TAG = ${params.runID}
+##[1] <- functions file
+##[2] <- GERMLINE = ${params.germline}
+##[3] <- VEPVCFPATTERN = $vartype".pass.vep"
+##[4] <- TAG = ${params.runID}
+##[5] <- INCLUDEORDER, if more than 1 sample define order for plots
 
 options(stringAsFactors=FALSE)
 args <- commandArgs(trailingOnly = TRUE)
 ##if defined, used R_LIB_PATHS
-.libPaths(args[1])
-
-source(args[2])
+source(args[1])
 
 ##germline sample ID
-GERMLINE <- args[3]
+GERMLINE <- args[2]
 
 ##VEP vcf pattern
 ##raw VCF must be *raw.vcf
-VEPVCFPATTERN <- args[4]
+VEPVCFPATTERN <- args[3]
 RAWVCFPATTERN <- "raw.vcf"
 
 ##string to tag output files
-TAG <- args[5] -> tag
-#INCLUDEORDER <- strSplitVec(args[5],",")[,1] ##comma delim string
+TAG <- args[4] -> tag
+
+if(length(args)==5){
+  INCLUDEORDER <- strSplitVec(args[5],",")[,1] ##comma delim string
+}
 
 ##parse VCFs
 ##all should exist in current dir, all output to same dir
@@ -119,7 +120,7 @@ plotList <- atLeastTwo(varList, GRsuper, tag=paste0(tag,".",VEPVCFPATTERN,".HM")
 ##plot
 if(length(plotList)>1){
   if(length(plotList[[1]])!=0 & length(plotList[[2]])!=0){
-    plotConsensusList(plotList, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".HM"))
+    plotConsensusList(plotList, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".HM"), includedOrder=INCLUDEDORDER)
   }
   if(length(plotList[[1]])!=0 & length(plotList[[2]])!=0){
     print("No variants returned at HM, support across callers lacking")
@@ -139,7 +140,7 @@ plotListAll <- atLeastTwo(varList, GRsuperALL, tag=paste0(tag,".",VEPVCFPATTERN,
 ##plot
 if(length(plotListAll)>1){
   if(length(plotListAll[[1]])!=0 & length(plotListAll[[2]])!=0){
-    plotConsensusList(plotListAll, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".ALL"))
+    plotConsensusList(plotListAll, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".ALL"), includedOrder=INCLUDEDORDER)
   }
   if(length(plotListAll[[1]])!=0 & length(plotListAll[[2]])!=0){
     print("No variants returned at ALL, support across callers lacking")

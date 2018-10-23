@@ -375,21 +375,8 @@ plotConsensusSingle <- function(plotList, rawList, tag, includeOrder=NULL){
   colnames(plotDFrawout) <- samples1
   rownames(plotDFrawout) <- uniqLabels
 
-  ##which samples to include, and order
-  ##remove those with all 0 frequency
-  plotDForder <- plotDFrawout[rowSums(plotDFrawout)!=0, colnames(plotDFrawout) %in% includeOrder]
-
-  ##reduce any frequency >50% to 50% (somatic should not be >50%)
-  ##and plot is purely representative
-  plotDForder[plotDForder > 0.5] <- 0.5
-
-  ##find all 0, count to allow separation, order
-  orderPlotDF <- order(plotDForder)
-  plotDF <- plotDForder[orderPlotDF]
-  orderUniqLabels <- uniqLabels[orderPlotDF]
-
   ##ordering
-  plotDFordered <- data.frame(plotDF, row.names=orderUniqLabels)
+  plotDFordered <- as_tibble(plotDFrawout, rownames="row") %>% dplyr::arrange(.[[2]]) %>% base::as.data.frame()
 
   ##exit if no variants
   if(is.null(plotDFordered)){
@@ -398,7 +385,8 @@ plotConsensusSingle <- function(plotList, rawList, tag, includeOrder=NULL){
   }
 
   if(!is.null(plotDFordered)){
-    plotVec <- plotDFordered
+    plotVec <- data.frame(row.names=plotDFordered[,1],
+                          tag=plotDFordered[,2])
     plotTag <- "variants"
 
     plotLabels <- rep("",times=dim(plotVec)[1])
