@@ -1,13 +1,11 @@
-# rescueSomaticVariantCalls
-## A method for recovering arbitrarily-filtered SNV calls allowing multiple callers
+# somaticVariantConsensus
+## A method for consensus SNV calls allowing multiple callers
 ## (Also makes plots)
 
 ### How to:
 
 **Required Inputs**
-- VCFs (at least two or the method is pointless) annotated by VEP90
- Unsure of absolute requirement of version 90, I have not tested outside this
- Flags for succesful below, NB to define those input variables:
+- VCFs (at least two or the method is pointless) annotated by VEP. Flags for succesful run below, NB to define those input variables:
  ```
  vep --dir_cache $CACHEDIR \
    --offline \
@@ -23,7 +21,7 @@
    --af_gnomad \
    --vcf \
    --input_file $VCF \
-   --output_file $VCFANNO \
+   --output_file $VCFOUT \
    --format "vcf" \
    --fasta $GENOME \
    --hgvs \
@@ -32,9 +30,7 @@
    --force_overwrite \
    --verbose
  ```
-- R libraries
- Install below, into the .libPath() location that you then give the scripts herein
- As I use PBS, library paths have been an issue so I now set specifically
+- R libraries. Install below, into the .libPath() location that you then give the scripts herein. As I use PBS, library paths have been an issue so I now set specifically. NB that NExtFlow with Singularity is coming soon, so this is WIP and provisional
  ```
  #set 'ask=FALSE' and then supply your local territory
  #alternatively, skip next line and lapply's and install 'by-hand' to allow updating a/s/n of dependencies
