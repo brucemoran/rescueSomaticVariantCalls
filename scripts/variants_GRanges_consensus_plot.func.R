@@ -418,17 +418,10 @@ plotConsensusSingle <- function(plotList, rawList, tag, includedOrder=NULL){
   }
 }
 
-exomeTumourMutationBurden <- function(GRplot, exomeBed=NULL){
+exomeTumourMutationBurden <- function(GRplot){
 
-  if(is.null(exomeBed)){
-    print(paste0("No exome BED input, please specify, exiting..."))
-    break
-  }
-  ##if exome Bed has a header line remove (test col2 row1 for numeric)
-  exomeBed <- read.table(exomeBed, header=FALSE)
-  if(! is.numeric(exomeBed[1,2])){
-    exomeBed <- exomeBed[-1,]
-  }
+  ##get exome for Illumina Nextera Rapid
+  exomeBed <- fread("https://support.illumina.com/content/dam/illumina-support/documents/documentation/chemistry_documentation/samplepreps_nextera/nexterarapidcapture/nexterarapidcapture_exome_targetedregions_v1.2.bed", showProgress=FALSE, data.table=FALSE)
 
   ##triage chr tag, add header
   exomeBed[,1] <- gsub("chr","",exomeBed[,1])
