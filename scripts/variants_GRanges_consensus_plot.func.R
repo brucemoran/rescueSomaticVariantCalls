@@ -211,12 +211,12 @@ atLeastTwo <- function(varList, GRsuper, tag, tmb=NULL){
 }
 
 ##create two plots: all consensus, those in 2+ samples
-plotConsensusList <- function(plotList, rawList, tag, includeOrder=NULL){
+plotConsensusList <- function(plotList, rawList, tag, includedOrder=NULL){
 
   ##remove hyphens
   samples1 <- gsub("-","_",names(plotList))
-  if(is.null(includeOrder)){
-    includeOrder <- samples1
+  if(is.null(includedOrder)){
+    includedOrder <- samples1
   }
   # ##plots are per mutype
   # mutype <- names(plotList)[x]
@@ -255,7 +255,7 @@ plotConsensusList <- function(plotList, rawList, tag, includeOrder=NULL){
 
   ##which samples to include, and order
   ##remove those with all 0 frequency
-  plotDForder <- plotDFrawout[rowSums(plotDFrawout)!=0, colnames(plotDFrawout) %in% includeOrder]
+  plotDForder <- plotDFrawout[rowSums(plotDFrawout)!=0, colnames(plotDFrawout) %in% includedOrder]
 
   ##reduce any frequency >50% to 50% (somatic should not be >50%)
   ##and plot is purely representative
@@ -268,12 +268,12 @@ plotConsensusList <- function(plotList, rawList, tag, includeOrder=NULL){
   notoVec1 <- notoVec[notoVec==1]
   notoVec2 <- notoVec[notoVec>1]
 
-  plotDF <- plotDForder[!rownames(plotDForder) %in% names(notoVec1), includeOrder1]
-  plotDF2 <- plotDForder[!rownames(plotDForder) %in% names(notoVec2), includeOrder1]
+  plotDF <- plotDForder[!rownames(plotDForder) %in% names(notoVec1), includedOrder1]
+  plotDF2 <- plotDForder[!rownames(plotDForder) %in% names(notoVec2), includedOrder1]
 
   ##ordering
   plotDF$labels <- rownames(plotDF)
-  orderDF <- dplyr::arrange_(plotDF,.dots=includeOrder1)
+  orderDF <- dplyr::arrange_(plotDF,.dots=includedOrder1)
   rownames(orderDF) <- orderDF$labels
   plotDFordered <- orderDF[,-c(grep("labels",colnames(orderDF)))]
   orderDF2 <- do.call(order, c(data.frame(plotDF2[, 1:(ncol(plotDF2)-1)], plotDF2[, ncol(plotDF2)])))
@@ -321,7 +321,7 @@ plotConsensusList <- function(plotList, rawList, tag, includeOrder=NULL){
       }
 
       pdf(paste0(tag,".",plotTag[[pl]],".consensus.onlyOverlap.pdf"),onefile=F)
-      pheatmap(plotVec[[pl]][,c(1:length(includeOrder1))],
+      pheatmap(plotVec[[pl]][,c(1:length(includedOrder1))],
          breaks=seq(from=0,to=0.5,length.out=101),
          color=colz(100),
          cluster_rows=FALSE,
@@ -332,14 +332,14 @@ plotConsensusList <- function(plotList, rawList, tag, includeOrder=NULL){
          fontsize_row=row_fontsize,
          labels_row=plotLabels,
          border_color="lightgrey",
-         gaps_col=c(1:length(includeOrder1))
+         gaps_col=c(1:length(includedOrder1))
       )
       dev.off()
     }
   }
 }
 
-plotConsensusSingle <- function(plotList, rawList, tag, includeOrder=NULL){
+plotConsensusSingle <- function(plotList, rawList, tag, includedOrder=NULL){
 
   ##remove hyphens
   samples1 <- gsub("-","_",names(plotList))
@@ -418,12 +418,19 @@ plotConsensusSingle <- function(plotList, rawList, tag, includeOrder=NULL){
   }
 }
 
-exomeTumourMutationBurden <- function(GRplot){
+exomeTumourMutationBurden <- function(GRplot, exomeBed=NULL){
 
-  ##get exome for Illumina Nextera Rapid
-  exomeBed <- fread("https://support.illumina.com/content/dam/illumina-support/documents/documentation/chemistry_documentation/samplepreps_nextera/nexterarapidcapture/nexterarapidcapture_exome_targetedregions_v1.2.bed", showProgress=FALSE, data.table=FALSE)
+  if(is.null(exomeBed)){
+    print(paste0("No exome BED input, please specify, exiting..."))
+    break
+  }
+  ##if exome Bed has a header line remove (test col2 row1 for numeric)
+  exomeBed <- read.table(exomeBed, header=FALSE)
+  if(! is.numeric(exomeBed[1,2])){
+    exomeBed <- exomeBed[-1,]
+  }
 
-  ##triage
+  ##triage chr tag, add header
   exomeBed[,1] <- gsub("chr","",exomeBed[,1])
   colnames(exomeBed) <- c("seqname", "start", "end")
   exomeGR <- makeGRangesFromDataFrame(exomeBed, ignore.strand=TRUE)

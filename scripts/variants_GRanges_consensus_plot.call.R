@@ -9,7 +9,7 @@
 ##[2] <- GERMLINE = ${params.germline}
 ##[3] <- VEPVCFPATTERN = $vartype".pass.vep"
 ##[4] <- TAG = ${params.runID}
-##[5] <- INCLUDEORDER, if more than 1 sample define order for plots
+##[5] <- INCLUDEDORDER, if more than 1 sample define order for plots
 
 options(stringAsFactors=FALSE)
 args <- commandArgs(trailingOnly = TRUE)
@@ -28,7 +28,7 @@ RAWVCFPATTERN <- "raw.vcf"
 TAG <- args[4] -> tag
 
 if(length(args)==5){
-  INCLUDEORDER <- strSplitVec(args[5],",")[,1] ##comma delim string
+  INCLUDEDORDER <- strSplitVec(args[5],",")[,1] ##comma delim string
 }
 
 ##parse VCFs
