@@ -268,24 +268,23 @@ plotConsensusList <- function(plotList, rawList, tag, includedOrder=NULL){
   notoVec1 <- notoVec[notoVec==1]
   notoVec2 <- notoVec[notoVec>1]
 
-  plotDF <- plotDForder[!rownames(plotDForder) %in% names(notoVec1), includedOrder1]
-  plotDF2 <- plotDForder[!rownames(plotDForder) %in% names(notoVec2), includedOrder1]
+  plotDF <- plotDForder[!rownames(plotDForder) %in% names(notoVec1), includedOrder]
+  plotDF2 <- plotDForder[!rownames(plotDForder) %in% names(notoVec2), includedOrder]
 
   ##ordering
   plotDF$labels <- rownames(plotDF)
-  orderDF <- dplyr::arrange_(plotDF,.dots=includedOrder1)
-  rownames(orderDF) <- orderDF$labels
-  plotDFordered <- orderDF[,-c(grep("labels",colnames(orderDF)))]
+  orderDF <- plotDF[, includedOrder]
+  rownames(orderDF) <- plotDF$labels
+  plotDFordered <- orderDF
   orderDF2 <- do.call(order, c(data.frame(plotDF2[, 1:(ncol(plotDF2)-1)], plotDF2[, ncol(plotDF2)])))
 
   ##exit if no variants
-  if(is.null(plotDFordered)){
+  if(is.null(orderDF)){
     print("No consensus variants found, exiting")
     break
   }
 
   else{
-
 
     ##no shared variants
     if(!is.null(orderDF2)){
@@ -309,32 +308,34 @@ plotConsensusList <- function(plotList, rawList, tag, includedOrder=NULL){
       break
     }
     for (pl in 1:length(plotVec)){
-      plotLabels <- rep("",dim(plotVec[[pl]])[1])
-      row_fontsize <- 1
-      colz <- colorRampPalette(c("lightgrey","dodgerblue","blue"))
-      if(dim(plotVec[[pl]])[1] < 120){
-        if(dim(plotVec[[pl]])[1]<20){row_fontsize=8}
-        if(dim(plotVec[[pl]])[1]<50){row_fontsize=6}
-        if(dim(plotVec[[pl]])[1]>50 & dim(plotVec[[pl]])[1]<100){row_fontsize=4}
-        if(dim(plotVec[[pl]])[1]>100){row_fontsize=2}
-        plotLabels <- rownames(plotVec[[pl]])
-      }
+      if(dim(plotVec[[1]])[2]!=0){
+        plotLabels <- rep("",dim(plotVec[[pl]])[1])
+        row_fontsize <- 1
+        colz <- colorRampPalette(c("lightgrey","dodgerblue","blue"))
+        if(dim(plotVec[[pl]])[1] < 120){
+          if(dim(plotVec[[pl]])[1]<20){row_fontsize=8}
+          if(dim(plotVec[[pl]])[1]<50){row_fontsize=6}
+          if(dim(plotVec[[pl]])[1]>50 & dim(plotVec[[pl]])[1]<100){row_fontsize=4}
+          if(dim(plotVec[[pl]])[1]>100){row_fontsize=2}
+          plotLabels <- rownames(plotVec[[pl]])
+        }
 
-      pdf(paste0(tag,".",plotTag[[pl]],".consensus.onlyOverlap.pdf"),onefile=F)
-      pheatmap(plotVec[[pl]][,c(1:length(includedOrder1))],
-         breaks=seq(from=0,to=0.5,length.out=101),
-         color=colz(100),
-         cluster_rows=FALSE,
-         cluster_cols=FALSE,
-         clustering_distance_rows=NA,
-         cellwidth=12,
-         legend=TRUE,
-         fontsize_row=row_fontsize,
-         labels_row=plotLabels,
-         border_color="lightgrey",
-         gaps_col=c(1:length(includedOrder1))
-      )
-      dev.off()
+        pdf(paste0(tag,".",plotTag[[pl]],".consensus.onlyOverlap.pdf"),onefile=F)
+        pheatmap(plotVec[[pl]][,c(1:length(includedOrder))],
+           breaks=seq(from=0,to=0.5,length.out=101),
+           color=colz(100),
+           cluster_rows=FALSE,
+           cluster_cols=FALSE,
+           clustering_distance_rows=NA,
+           cellwidth=12,
+           legend=TRUE,
+           fontsize_row=row_fontsize,
+           labels_row=plotLabels,
+           border_color="lightgrey",
+           gaps_col=c(1:length(includedOrder))
+        )
+        dev.off()
+      }
     }
   }
 }
@@ -376,7 +377,9 @@ plotConsensusSingle <- function(plotList, rawList, tag, includedOrder=NULL){
   rownames(plotDFrawout) <- uniqLabels
 
   ##ordering
-  plotDFordered <- as_tibble(plotDFrawout, rownames="row") %>% dplyr::arrange(.[[2]]) %>% base::as.data.frame()
+  plotDFordered <- as_tibble(plotDFrawout, rownames="row") %>%
+                   dplyr::arrange(.[[2]]) %>%
+                   base::as.data.frame()
 
   ##exit if no variants
   if(is.null(plotDFordered)){
