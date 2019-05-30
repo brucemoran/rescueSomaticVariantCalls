@@ -10,6 +10,7 @@
 ##[3] <- VEPVCFPATTERN = $vartype".pass.vep"
 ##[4] <- TAG = ${params.runID}
 ##[5] <- INCLUDEDORDER, if more than 1 sample define order for plots
+##[6] <- NAMECALLERS, variant callers to use in superset, 2 and only 2 required!
 
 options(stringAsFactors=FALSE)
 args <- commandArgs(trailingOnly = TRUE)
@@ -28,7 +29,22 @@ RAWVCFPATTERN <- "raw.vcf"
 TAG <- args[4] -> tag
 
 if(length(args)==5){
-  INCLUDEDORDER <- strSplitVec(args[5],",")[,1] ##comma delim string
+  if(length(args[5][grep("\\,", args[5])])>0){
+    INCLUDEDORDER <- strSplitVec(args[5],",")[,1] ##comma delim string
+  }
+  else{
+    INCLUDEDORDER <- dir(pattern="vcf") %>%
+                     lapply(.,function(f){strsplit(f,"\\.")[[1]][1]}) %>%
+                     unlist() %>%
+                     unique()
+  }
+}
+
+if(length(args)==6){
+  NAMECALLERS <- strSplitVec(args[6],",")[,1]
+}
+if(length(args)<6){
+  NAMECALLERS <- NULL
 }
 
 ##parse VCFs
@@ -111,41 +127,55 @@ varList <- get(loadedGR[[vcfExt]])
 callers <- names(varList)
 samples <- names(varList[[1]])
 
-##get GRanges superset per mutype
-GRsuper <- GRsuperSet(varList)
-
-##get list to plot from
-plotList <- atLeastTwo(varList, GRsuper, tag=paste0(tag,".",VEPVCFPATTERN,".HM"))
-
-##plot
-if(length(plotList)>1){
-  if(length(plotList[[1]])!=0 & length(plotList[[2]])!=0){
-    plotConsensusList(plotList, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".HM"), includedOrder=INCLUDEDORDER)
-  }
-  if(length(plotList[[1]])!=0 & length(plotList[[2]])!=0){
-    print("No variants returned at HM, support across callers lacking")
-  }
-}
-if(length(plotList)==1){
-  plotConsensusSingle(plotList, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".HM"))
+##ensure some variants in each sample to check on
+anyVars <- c()
+for(x in 1:length(varList)){
+  for(y in 1:length(samples))
+  anyVars <- c(anyVars, length(varList[[x]][[y]]))
 }
 
-##run to get all impacts, print but not plot
-##get GRanges superset per mutype
-GRsuperALL <- GRsuperSet(varList, impacts=c("HIGH","MODERATE","MODIFIER","LOW"))
+if(all(anyVars > 0)){
+  ##get GRanges superset per mutype
+  GRsuper <- GRsuperSet(varList, nameCallers=NAMECALLERS)
 
-##get list to plot from
-plotListAll <- atLeastTwo(varList, GRsuperALL, tag=paste0(tag,".",VEPVCFPATTERN,".ALL"), tmb="snv")
+  ##get list to plot from
+  plotList <- atLeastTwo(varList,
+                         GRsuper,
+                         tag=paste0(tag,".",VEPVCFPATTERN,".HM"))
 
-##plot
-if(length(plotListAll)>1){
-  if(length(plotListAll[[1]])!=0 & length(plotListAll[[2]])!=0){
-    plotConsensusList(plotListAll, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".ALL"), includedOrder=INCLUDEDORDER)
+  ##plot
+  if(length(plotList)>1){
+    if(length(plotList[[1]])!=0 & length(plotList[[2]])!=0){
+      plotConsensusList(plotList, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".HM"), includedOrder=INCLUDEDORDER)
+    }
+    if(length(plotList[[1]])!=0 & length(plotList[[2]])!=0){
+      print("No variants returned at HM, support across callers lacking")
+    }
   }
-  if(length(plotListAll[[1]])!=0 & length(plotListAll[[2]])!=0){
-    print("No variants returned at ALL, support across callers lacking")
+  if(length(plotList)==1){
+    plotConsensusSingle(plotList, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".HM"))
+  }
+
+  ##run to get all impacts, print but not plot
+  ##get GRanges superset per mutype
+  GRsuperALL <- GRsuperSet(varList, impacts=c("HIGH","MODERATE","MODIFIER","LOW"))
+
+  ##get list to plot from
+  plotListAll <- atLeastTwo(varList, GRsuperALL, tag=paste0(tag,".",VEPVCFPATTERN,".ALL"), tmb="snv")
+
+  ##plot
+  if(length(plotListAll)>1){
+    if(length(plotListAll[[1]])!=0 & length(plotListAll[[2]])!=0){
+      plotConsensusList(plotListAll, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".ALL"), includedOrder=INCLUDEDORDER)
+    }
+    if(length(plotListAll[[1]])!=0 & length(plotListAll[[2]])!=0){
+      print("No variants returned at ALL, support across callers lacking")
+    }
+  }
+  if(length(plotListAll)==1){
+    plotConsensusSingle(plotListAll, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".ALL"))
   }
 }
-if(length(plotListAll)==1){
-  plotConsensusSingle(plotListAll, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".ALL"))
+if(all(anyVars == 0)){
+  print(paste0("No variants found for: ", args[3], ", exited..."))
 }

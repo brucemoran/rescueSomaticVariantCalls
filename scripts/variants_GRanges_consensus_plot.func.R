@@ -4,6 +4,12 @@
 
 ##load libraries
 libs <- c("ensemblVEP", "org.Hs.eg.db", "customProDB", "GenomicRanges", "tidyverse", "bio3d", "plyr", "pheatmap", "data.table")
+for(x in 1:length(libs)){
+  if(!libs[x] %in% rownames(installed.packages())){
+    library("BiocManager")
+    BiocManager::install(libs[x])
+  }
+}
 libsLoaded <- lapply(libs,function(l){suppressMessages(library(l, character.only = TRUE))})
 
 strSplitFun <- function(input,sepn){
@@ -14,7 +20,7 @@ strSplitVec <- function(inVec,sepn){
 }
 
 ##parse VCF into GR, for use on un-annotated VCFs
-vcfParseGR <- function(vcfIn,germline){
+vcfParseGR <- function(vcfIn, germline){
 
   vcf <- readVcf(vcfIn)
   gr <- suppressWarnings(InputVcf(vcfIn))
@@ -23,11 +29,22 @@ vcfParseGR <- function(vcfIn,germline){
   infor <- info(header(vcf))
 
   ##somatic
-  somName <- names(gr)[names(gr)!=germline]
+  if(!is.null(germline)){
+    somName <- names(gr)[names(gr)!=germline]
+  }
+  if(is.null(germline)){
+    somName <- names(gr)
+  }
   print(paste0("Working on: ",somName))
   som <- gr[[somName]]
+  ##ensure an AF is there, pisces has VF instead (thanks pisces dev=D)
+  if(! "AF" %in% names(mcols(som))) {
+    AD <- as.numeric(unlist(mcols(som)["AD"]))
+    AD1 <- as.numeric(unlist(mcols(som)["AD.1"]))
+    tot <- AD+AD1
+    mcols(som)$AF <- AD1/tot
+  }
   seqinfo(som) <- seqinfo(vcf)[seqlevels(som)]
-
   return(som)
 }
 
@@ -45,10 +62,23 @@ vcfVepAnnParseGR <- function(vcfIn, germline){
     annNames <- unlist(strSplitFun(infor[rownames(infor)=="ANN",]$Description,"\\|"))
 
     ##somatic
-    somName <- names(gr)[names(gr)!=germline]
+    if(!is.null(germline)){
+      somName <- names(gr)[names(gr)!=germline]
+    }
+    if(is.null(germline)){
+      somName <- names(gr)
+    }
     print(paste0("Working on: ",somName))
     som <- gr[[somName]]
     seqinfo(som) <- seqinfo(vcf)[seqlevels(som)]
+
+    ##ensure an AF is there, pisces has VF instead (thanks pisces dev=D)
+    if(! "AF" %in% names(mcols(som))){
+      AD <- as.numeric(unlist(mcols(som)["AD"]))
+      AD1 <- as.numeric(unlist(mcols(som)["AD.1"]))
+      tot <- AD+AD1
+      mcols(som)$AF <- AD1/tot
+    }
 
     ##annotation by CANONICAL, and add to mcols
     somAnnDf <- t(as.data.frame(lapply(strSplitFun(som$ANN,"\\|"),function(ff){
@@ -144,6 +174,15 @@ GRsuperSet <- function(varList, impacts=NULL, mcolsWant=NULL, nameCallers=NULL){
     calls1 <- call1[[x]]
     calls2 <- call2[[x]]
 
+    ##test all wanted mcols exist, rename if "VF" not "AF" (Pisces)
+    for(y in 1:2){
+      if(length(mcolsWant[mcolsWant %in% names(mcols(call1[[y]]))]) != length(mcolsWant)){
+        gsub("VF","AF", names(mcols(call1[[y]])))
+      }
+      if(length(mcolsWant[mcolsWant %in% names(mcols(call2[[y]]))]) != length(mcolsWant)){
+        gsub("VF","AF", names(mcols(call2[[y]])))
+      }
+    }
     calls1$HGVSp1 <- subHGVSp(calls1$HGVSp)
     calls2$HGVSp1 <- subHGVSp(calls2$HGVSp)
 
@@ -214,43 +253,57 @@ atLeastTwo <- function(varList, GRsuper, tag, tmb=NULL){
 plotConsensusList <- function(plotList, rawList, tag, includedOrder=NULL){
 
   ##remove hyphens
-  samples1 <- gsub("-","_",names(plotList))
+  samples <- gsub("-","_",names(plotList))
   if(is.null(includedOrder)){
-    includedOrder <- samples1
+    includedOrder <- samples
   }
-  # ##plots are per mutype
-  # mutype <- names(plotList)[x]
-  # print(paste0("Working on: ", mutype))
+  if(!is.null(INCLUDEDORDER)){
+    includedOrder <- gsub("-","_",INCLUDEDORDER)
+  }
 
   ##combined set of all samples
-  combSet <- suppressWarnings(unique(do.call("c", unname(plotList))))
-  seqlevels(combSet) <- sort(seqlevels(combSet))
-  combSet <- sort(combSet)
-  combDF <- as.data.frame(combSet)
+  combGR <- suppressWarnings(unique(do.call("c", unname(plotList))))
+  seqlevels(combGR) <- sort(seqlevels(combGR))
+  combGR <- sort(combGR)
+  combDF <- as.data.frame(combGR)
 
   ##labels for plot
-  hgvsp <- unlist(lapply(combSet$HGVSp1,function(f){strsplit(f,"\\.")[[1]][3]}))
-  uniqLabels <- paste0(names(combSet),":",combDF$SYMBOL,":",combDF$Consequence, ":", hgvsp)
+  hgvsp <- unlist(lapply(combGR$HGVSp1,function(f){
+    strsplit(f,"\\.")[[1]][3]
+  }))
+  uniqLabels <- paste(names(combGR),
+                     combDF$SYMBOL,
+                     combDF$Consequence,
+                     hgvsp, sep=":")
 
   ##take those positions, then query raw calls
   ##allows 'rescue' of those falling out from arbitrary filters
-  ##enough support previously to allow re-entry AFAICS
-  plotDFrawout <- as.data.frame(lapply(rawList,function(ff){
-          afs <- rep(0,length(combSet))
-          lapply(ff,function(fff){
-          seqlevels(fff) <- sort(seqlevels(fff))
-          ffs <- sort(fff)
-          ffsi <- ffs[ffs %in% combSet]
-          afs[combSet %in% ffsi] <- as.numeric(mcols(ffsi)$AF)
-          return(afs)
-        })}))
-
-  plotDFrawout <- do.call(cbind,lapply(samples1, function(ss){
+  ##enough support previously to allow re-entry
+  rawAFs <- function(rawList){
+    as.data.frame(lapply(rawList,function(ff){
+      afs <- rep(0,length(combGR))
+      lapply(ff,function(fff){
+        seqlevels(fff) <- sort(seqlevels(fff))
+        ffs <- sort(fff)
+        ffsi <- ffs[ffs %in% combGR]
+        afs[combGR %in% ffsi] <- as.numeric(mcols(ffsi)$AF)
+        return(afs)
+      })
+    }))
+  }
+  plotDFrawout <- rawAFs(rawList)
+  if(length(warnings())>1){
+    plotDFrawout <- rawAFs(rawList)
+  }
+  colnames(plotDFrawout) <- unlist(lapply(names(rawList),function(f){
+    paste(f,samples,sep=".")
+  }))
+  plotDFrawout <- do.call(cbind,lapply(samples, function(ss){
     apply(plotDFrawout[,grep(ss, colnames(plotDFrawout))],1,max)
   }))
 
   plotDFrawout <- as.data.frame(plotDFrawout)
-  colnames(plotDFrawout) <- samples1
+  colnames(plotDFrawout) <- samples
   rownames(plotDFrawout) <- uniqLabels
 
   ##which samples to include, and order
@@ -262,26 +315,32 @@ plotConsensusList <- function(plotList, rawList, tag, includedOrder=NULL){
   plotDForder[plotDForder > 0.5] <- 0.5
 
   ##find all 0, count to allow separation, order
-  notoDF <- do.call(cbind,list(apply(plotDForder,2,function(f){f!=0})))
+  notoDF <- do.call(cbind,list(apply(plotDForder,2,function(f){
+    f!=0
+  })))
   notoVec <- apply(notoDF,1,function(f){table(f)[[1]]})
   notoVec <- notoVec[!is.na(notoVec)]
   notoVec1 <- notoVec[notoVec==1]
   notoVec2 <- notoVec[notoVec>1]
 
-  plotDF <- plotDForder[!rownames(plotDForder) %in% names(notoVec1), includedOrder]
+  ##those in all samples
+  plotDF1 <- plotDForder[!rownames(plotDForder) %in% names(notoVec1), includedOrder]
   plotDF2 <- plotDForder[!rownames(plotDForder) %in% names(notoVec2), includedOrder]
 
+  ##write out those in plotDF
+  writeConsensusAll(plotList=plotList, plotDF=plotDF1, tag=tag, includedOrder=includedOrder, cons="consensus")
+  writeConsensusAll(plotList=plotList, plotDF=plotDF2, tag=tag, includedOrder=includedOrder, cons="not_consensus")
+
   ##ordering
-  plotDF$labels <- rownames(plotDF)
-  orderDF <- plotDF[, includedOrder]
-  rownames(orderDF) <- plotDF$labels
+  plotDF1$labels <- rownames(plotDF1)
+  orderDF <- plotDF1[, includedOrder]
+  rownames(orderDF) <- plotDF1$labels
   plotDFordered <- orderDF
   orderDF2 <- do.call(order, c(data.frame(plotDF2[, 1:(ncol(plotDF2)-1)], plotDF2[, ncol(plotDF2)])))
 
   ##exit if no variants
   if(is.null(orderDF)){
     print("No consensus variants found, exiting")
-    break
   }
 
   else{
@@ -305,36 +364,37 @@ plotConsensusList <- function(plotList, rawList, tag, includedOrder=NULL){
     }
     if(dim(plotDFordered)[1] == 0){
       print("No variants to plot")
-      break
     }
-    for (pl in 1:length(plotVec)){
-      if(dim(plotVec[[1]])[2]!=0){
-        plotLabels <- rep("",dim(plotVec[[pl]])[1])
-        row_fontsize <- 1
-        colz <- colorRampPalette(c("lightgrey","dodgerblue","blue"))
-        if(dim(plotVec[[pl]])[1] < 120){
-          if(dim(plotVec[[pl]])[1]<20){row_fontsize=8}
-          if(dim(plotVec[[pl]])[1]<50){row_fontsize=6}
-          if(dim(plotVec[[pl]])[1]>50 & dim(plotVec[[pl]])[1]<100){row_fontsize=4}
-          if(dim(plotVec[[pl]])[1]>100){row_fontsize=2}
-          plotLabels <- rownames(plotVec[[pl]])
-        }
+    if(dim(plotDFordered)[1] != 0){
+      for (pl in 1:length(plotVec)){
+        if(dim(plotVec[[1]])[2]!=0){
+          plotLabels <- rep("",dim(plotVec[[pl]])[1])
+          row_fontsize <- 1
+          colz <- colorRampPalette(c("lightgrey","dodgerblue","blue"))
+          if(dim(plotVec[[pl]])[1] < 120){
+            if(dim(plotVec[[pl]])[1]<20){row_fontsize=8}
+            if(dim(plotVec[[pl]])[1]<50){row_fontsize=6}
+            if(dim(plotVec[[pl]])[1]>50 & dim(plotVec[[pl]])[1]<100){row_fontsize=4}
+            if(dim(plotVec[[pl]])[1]>100){row_fontsize=2}
+            plotLabels <- rownames(plotVec[[pl]])
+          }
 
-        pdf(paste0(tag,".",plotTag[[pl]],".consensus.onlyOverlap.pdf"),onefile=F)
-        pheatmap(plotVec[[pl]][,c(1:length(includedOrder))],
-           breaks=seq(from=0,to=0.5,length.out=101),
-           color=colz(100),
-           cluster_rows=FALSE,
-           cluster_cols=FALSE,
-           clustering_distance_rows=NA,
-           cellwidth=12,
-           legend=TRUE,
-           fontsize_row=row_fontsize,
-           labels_row=plotLabels,
-           border_color="lightgrey",
-           gaps_col=c(1:length(includedOrder))
-        )
-        dev.off()
+          pdf(paste0(tag,".",plotTag[[pl]],".consensus.onlyOverlap.pdf"),onefile=F)
+          pheatmap(plotVec[[pl]][,c(1:length(includedOrder))],
+             breaks=seq(from=0,to=0.5,length.out=101),
+             color=colz(100),
+             cluster_rows=FALSE,
+             cluster_cols=FALSE,
+             clustering_distance_rows=NA,
+             cellwidth=12,
+             legend=TRUE,
+             fontsize_row=row_fontsize,
+             labels_row=plotLabels,
+             border_color="lightgrey",
+             gaps_col=c(1:length(includedOrder))
+          )
+          dev.off()
+        }
       }
     }
   }
@@ -343,37 +403,51 @@ plotConsensusList <- function(plotList, rawList, tag, includedOrder=NULL){
 plotConsensusSingle <- function(plotList, rawList, tag, includedOrder=NULL){
 
   ##remove hyphens
-  samples1 <- gsub("-","_",names(plotList))
+  samples <- gsub("-","_",names(plotList))
 
   ##combined set of all samples
-  combSet <- suppressWarnings(unique(do.call("c", unname(plotList))))
-  seqlevels(combSet) <- sort(seqlevels(combSet))
-  combSet <- sort(combSet)
-  combDF <- as.data.frame(combSet)
+  combGR <- suppressWarnings(unique(do.call("c", unname(plotList))))
+  seqlevels(combGR) <- sort(seqlevels(combGR))
+  combGR <- sort(combGR)
+  combDF <- as.data.frame(combGR)
 
   ##labels for plot
-  hgvsp <- unlist(lapply(combSet$HGVSp1,function(f){strsplit(f,"\\.")[[1]][3]}))
-  uniqLabels <- paste0(names(combSet),":",combDF$SYMBOL,":",combDF$Consequence, ":", hgvsp)
+  hgvsp <- unlist(lapply(combGR$HGVSp1,function(f){
+    strsplit(f,"\\.")[[1]][3]
+  }))
+  uniqLabels <- paste(names(combGR),
+                     combDF$SYMBOL,
+                     combDF$Consequence,
+                     hgvsp, sep=":")
 
   ##take those positions, then query raw calls
   ##allows 'rescue' of those falling out from arbitrary filters
-  ##enough support previously to allow re-entry AFAICS
-  plotDFrawout <- as.data.frame(lapply(rawList,function(ff){
-          afs <- rep(0,length(combSet))
-          lapply(ff,function(fff){
-          seqlevels(fff) <- sort(seqlevels(fff))
-          ffs <- sort(fff)
-          ffsi <- ffs[ffs %in% combSet]
-          afs[combSet %in% ffsi] <- as.numeric(mcols(ffsi)$AF)
-          return(afs)
-        })}))
-
-  plotDFrawout <- do.call(cbind,lapply(samples1, function(ss){
+  ##enough support previously to allow re-entry
+  rawAFs <- function(rawList){
+    as.data.frame(lapply(rawList,function(ff){
+      afs <- rep(0,length(combGR))
+      lapply(ff,function(fff){
+        seqlevels(fff) <- sort(seqlevels(fff))
+        ffs <- sort(fff)
+        ffsi <- ffs[ffs %in% combGR]
+        afs[combGR %in% ffsi] <- as.numeric(mcols(ffsi)$AF)
+        return(afs)
+      })
+    }))
+  }
+  plotDFrawout <- rawAFs(rawList)
+  if(length(warnings())>1){
+    plotDFrawout <- rawAFs(rawList)
+  }
+  colnames(plotDFrawout) <- unlist(lapply(names(rawList),function(f){
+    paste(f,samples,sep=".")
+  }))
+  plotDFrawout <- do.call(cbind,lapply(samples, function(ss){
     apply(plotDFrawout[,grep(ss, colnames(plotDFrawout))],1,max)
   }))
 
   plotDFrawout <- as.data.frame(plotDFrawout)
-  colnames(plotDFrawout) <- samples1
+  colnames(plotDFrawout) <- samples
   rownames(plotDFrawout) <- uniqLabels
 
   ##ordering
@@ -382,12 +456,11 @@ plotConsensusSingle <- function(plotList, rawList, tag, includedOrder=NULL){
                    base::as.data.frame()
 
   ##exit if no variants
-  if(is.null(plotDFordered)){
+  if(dim(plotDFordered)[1] == 0){
     print("No consensus variants found, exiting")
-    break
   }
 
-  if(!is.null(plotDFordered)){
+  if(dim(plotDFordered)[1] != 0){
     plotVec <- data.frame(row.names=plotDFordered[,1],
                           tag=plotDFordered[,2])
     plotTag <- "variants"
@@ -438,4 +511,65 @@ exomeTumourMutationBurden <- function(GRplot){
   GRplotExome <- GRplot[hits$queryHits]
   TMB <- round(length(GRplotExome)/exomeSize,digits=1)
   return(TMB)
+}
+
+##function to return overlapping variants for all samples
+writeConsensusAll <- function(plotList, plotDF, tag, includedOrder=NULL, cons=NULL){
+
+  if(is.null(cons)){
+    print("Require 'cons=c(\"consensus\", \"not_cons\")' to determine output type...")
+  }
+
+  if(!is.null(cons)){
+    ##input names
+    samples <- gsub("-","_",names(plotList))
+
+    if(is.null(includedOrder)){
+      includedOrder <- samples
+    }
+
+    ##split on colon, paste into label for plotList
+    labelsOut <- unlist(lapply(strSplitFun(rownames(plotDF), ":"), function(f){
+      paste0(f[1],":",f[2])
+    }))
+
+    ##parse required from plotList
+    plotOut <- lapply(plotList, function(f){
+      f[names(f) %in% labelsOut]
+    })
+
+    ##tabulate names
+    tableNames <- table(as.vector(unlist(lapply(plotOut, function(f){
+      names(f)
+    }))))
+
+    ##take those in every plotList
+    outNames <- names(tableNames[tableNames == length(plotList)])
+
+    ##create output
+    for (x in seq_along(includedOrder)){
+      if(x==1){
+        sortRet <- sort(plotList[[x]][outNames])
+        sortRetAnn <- sortRet[,c(4:length(mcols(sortRet)))]
+        sortRetVar <- sortRet[,c(1:3)]
+        names(mcols(sortRetVar)) <- paste0(c("REF_AD","ALT_AD","AF"), paste0("-", names(plotList)[x]))
+      }
+      if(x!=1){
+        sortRetVarx <- sort(plotList[[x]][outNames, c("AD","AD.1","AF")])
+        names(mcols(sortRetVarx)) <- paste0(c("REF_AD","ALT_AD","AF"), paste0("-", names(plotList)[x]))
+        values(sortRetVar) <- c(values(sortRetVar), values(sortRetVarx))
+      }
+    }
+    values(sortRetAnn) <- c(values(sortRetAnn), values(sortRetVar))
+
+    ##write output
+    if(cons == "consensus"){
+      fileOut <- paste0(tag,".only-consensus.tab")
+      write.table(sortRetAnn, file=fileOut, quote=F, row=F, col=T, sep="\t")
+    }
+    if(cons != "consensus"){
+      fileOut <- paste0(tag,".not-consensus.tab")
+      write.table(sortRetAnn, file=fileOut, quote=F, row=F, col=T, sep="\t")
+    }
+  }
 }
