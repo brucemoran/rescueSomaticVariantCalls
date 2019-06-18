@@ -4,12 +4,6 @@
 
 ##load libraries
 libs <- c("ensemblVEP", "org.Hs.eg.db", "customProDB", "GenomicRanges", "tidyverse", "bio3d", "plyr", "pheatmap", "data.table")
-for(x in 1:length(libs)){
-  if(!libs[x] %in% rownames(installed.packages())){
-    library("BiocManager")
-    BiocManager::install(libs[x])
-  }
-}
 libsLoaded <- lapply(libs,function(l){suppressMessages(library(l, character.only = TRUE))})
 
 strSplitFun <- function(input,sepn){
@@ -20,36 +14,41 @@ strSplitVec <- function(inVec,sepn){
 }
 
 ##parse VCF into GR, for use on un-annotated VCFs
-vcfParseGR <- function(vcfIn, germline){
+vcfParseGR <- function(vcfIn, tumourPattern){
 
   vcf <- readVcf(vcfIn)
-  gr <- suppressWarnings(InputVcf(vcfIn))
+  if(dim(vcf)[1]!=0){
+    gr <- suppressWarnings(InputVcf(vcfIn))
 
-  ##parse info
-  infor <- info(header(vcf))
+    ##parse info
+    infor <- info(header(vcf))
 
-  ##somatic
-  if(!is.null(germline)){
-    somName <- names(gr)[names(gr)!=germline]
+    ##somatic
+    if(!is.null(tumourPattern)){
+      somName <- names(gr)[grep(tumourPattern, names(gr))]
+    }
+    if(is.null(tumourPattern)){
+      somName <- names(gr)
+    }
+    print(paste0("Working on: ",somName))
+    som <- gr[[somName]]
+    ##ensure an AF is there, pisces has VF instead (thanks pisces dev=D)
+    if(! "AF" %in% names(mcols(som))) {
+      AD <- as.numeric(unlist(mcols(som)["AD"]))
+      AD1 <- as.numeric(unlist(mcols(som)["AD.1"]))
+      tot <- AD+AD1
+      mcols(som)$AF <- AD1/tot
+    }
+    seqinfo(som) <- seqinfo(vcf)[seqlevels(som)]
+    return(som)
   }
-  if(is.null(germline)){
-    somName <- names(gr)
+  else{
+    return(NULL)
   }
-  print(paste0("Working on: ",somName))
-  som <- gr[[somName]]
-  ##ensure an AF is there, pisces has VF instead (thanks pisces dev=D)
-  if(! "AF" %in% names(mcols(som))) {
-    AD <- as.numeric(unlist(mcols(som)["AD"]))
-    AD1 <- as.numeric(unlist(mcols(som)["AD.1"]))
-    tot <- AD+AD1
-    mcols(som)$AF <- AD1/tot
-  }
-  seqinfo(som) <- seqinfo(vcf)[seqlevels(som)]
-  return(som)
 }
 
 #parse VEP annotated VCF into GR, uses CANONICAL transcript
-vcfVepAnnParseGR <- function(vcfIn, germline){
+vcfVepAnnParseGRbatch <- function(vcfIn, tumourPattern){
 
   vcf <- readVcf(vcfIn)
   if(dim(vcf)[1] != 0){
@@ -62,10 +61,10 @@ vcfVepAnnParseGR <- function(vcfIn, germline){
     annNames <- unlist(strSplitFun(infor[rownames(infor)=="ANN",]$Description,"\\|"))
 
     ##somatic
-    if(!is.null(germline)){
-      somName <- names(gr)[names(gr)!=germline]
+    if(!is.null(tumourPattern)){
+      somName <- names(gr)[grep(tumourPattern, names(gr))]
     }
-    if(is.null(germline)){
+    if(is.null(tumourPattern)){
       somName <- names(gr)
     }
     print(paste0("Working on: ",somName))
@@ -252,6 +251,7 @@ atLeastTwo <- function(varList, GRsuper, tag, tmb=NULL){
       ##VCF output
       ###CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT
       ##1	33238563	.	G	A	.	PASS	TVAF=0.145833333333;TDP=49;	GT:DPC:DPT:ADC:ADT	0/1:.:DP:.,.:AD,AD.1
+      if(length(GRplot)>0){
       vcfGRplot <- as_tibble(as.data.frame(GRplot), rownames="r") %>%
         tidyr::separate(r,
                         c("#CHROM", "POS", "REF", "ALT"),
@@ -272,6 +272,7 @@ atLeastTwo <- function(varList, GRsuper, tag, tmb=NULL){
         dplyr::rename(!!sample:="sampleID")
 
       write_tsv(path=vcfOut, vcfGRplot)
+    }
       return(GRplot)
     })
 

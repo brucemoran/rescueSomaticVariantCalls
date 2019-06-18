@@ -6,7 +6,7 @@
 
 ##inputs
 ##[1] <- functions file
-##[2] <- GERMLINE = ${params.germline}
+##[2] <- tumourPattern = ${params.tumourPattern}
 ##[3] <- VEPVCFPATTERN = $vartype".pass.vep"
 ##[4] <- TAG = ${params.runID}
 ##[5] <- INCLUDEDORDER, if more than 1 sample define order for plots
@@ -18,7 +18,7 @@ args <- commandArgs(trailingOnly = TRUE)
 source(args[1])
 
 ##germline sample ID
-GERMLINE <- args[2]
+TUMOURPATTERN <- args[2]
 
 ##VEP vcf pattern
 ##raw VCF must be *raw.vcf
@@ -39,6 +39,8 @@ if(length(args)<6){
 ##all should exist in current dir, all output to same dir
 vcfVec <- dir(pattern=VEPVCFPATTERN)
 vcfList <- vcfVec[grep(paste0(VEPVCFPATTERN,"$"),vcfVec)]
+vcfList <- vcfList[grep(paste0(TUMOURPATTERN),vcfList)]
+
 rawVec <- dir(pattern=RAWVCFPATTERN)
 rawList <- rawVec[grep(paste0(RAWVCFPATTERN,"$"),rawVec)]
 inputList <- list(vcfList, rawList)
@@ -59,6 +61,11 @@ if(length(args)==5){
                      lapply(.,function(f){strsplit(f,"\\.")[[1]][1]}) %>%
                      unlist() %>% unique()
   }
+}
+if(length(args)<5){
+  INCLUDEDORDER <- vcfList %>%
+                   lapply(.,function(f){strsplit(f,"\\.")[[1]][1]}) %>%
+                   unlist() %>% unique()
 }
 
 ##operate over varianttype, raw
@@ -87,15 +94,15 @@ for(x in 1:2){
       ##parse VCFs, raw or VEP annotated
       if(outExt == "raw"){
         grList[[caller]] <- lapply(inList[grep(caller,callers)],function(f){
-          suppressWarnings(vcfParseGR(f, GERMLINE))
+          suppressWarnings(vcfParseGR(f, TUMOURPATTERN))
         })
       }
       else{
         grList[[caller]] <- lapply(inList[grep(caller,callers)],function(f){
-          suppressWarnings(vcfVepAnnParseGR(f, GERMLINE))
+          suppressWarnings(vcfVepAnnParseGRbatch(f, TUMOURPATTERN))
         })
       }
-      names(grList[[caller]]) <- samples[grep(caller,callers)]
+      names(grList[[caller]]) <- samples[grep(caller, callers)]
     }
 
     dirtest <- dir(pattern=paste0(outExt,".RData"))
