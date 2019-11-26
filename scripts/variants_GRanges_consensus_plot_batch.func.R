@@ -3,7 +3,7 @@
 ##functions for SNV_consensus generation and plotting
 
 ##load libraries
-libs <- c("ensemblVEP", "org.Hs.eg.db", "customProDB", "GenomicRanges", "tidyverse", "bio3d", "plyr", "pheatmap", "data.table")
+libs <- c("customProDB", "ensemblVEP", "org.Hs.eg.db", "GenomicRanges", "tidyverse", "plyr", "pheatmap", "data.table")
 libsLoaded <- lapply(libs,function(l){suppressMessages(library(l, character.only = TRUE))})
 
 strSplitFun <- function(input,sepn){
@@ -110,15 +110,10 @@ vcfVepAnnParseGRbatch <- function(vcfIn, tumourPattern){
 ##create single-letter HGVS protein annotation (VEP outputs 3-letter)
 ##take vector, gsub out aa3 for aa1
 subHGVSp <- function(inVec){
-  lib <- c("bio3d")
-  loadedLib <- lapply(lib,function(l){suppressMessages(library(l, character.only = TRUE))})
 
-  aa1 <- bio3d::aa.table$aa1
+  aa1 <- c("A", "R", "N", "D", "C", "Q", "E", "G", "H", "I", "L", "K", "M", "F", "P", "S", "T", "W", "Y", "V", "X", "D", "R", "C", "C", "C", "C", "C", "C", "C", "C", "H", "G", "H", "H", "H", "H", "H", "H", "D", "K", "K", "M", "K", "M", "C", "F", "Y", "S", "T")
   ##amino acid 3 letter to gsub HGVSp
-  aa3 <- unlist(lapply(bio3d::aa.table$aa3,function(f){
-    sp <- strsplit(f,"")[[1]];
-    paste0(sp[1], tolower(sp[2]),tolower(sp[3]))
-  }))
+  aa3 <- c("Ala","Arg", "Asn", "Asp", "Cys", "Gln", "Glu", "Gly", "His", "Ile", "Leu", "Lys", "Met", "Phe", "Pro", "Ser", "Thr", "Trp", "Tyr", "Val", "Aba", "Ash", "Cir", "Cme", "Cmt", "Csd", "Cso", "Csw", "Csx", "Cym", "Cyx", "Dde", "Glh", "Hid", "Hie", "Hip", "Hsd", "Hse", "Hsp", "Ias", "Kcx", "Lyn", "Mho", "Mly", "Mse", "Ocs", "Pff", "Ptr", "Sep", "Tpo")
 
   ##include * for Ter
   aa1 <-c(aa1,"*")

@@ -3,13 +3,8 @@
 ##functions for SNV_consensus generation and plotting
 
 ##load libraries
-libs <- c("ensemblVEP", "org.Hs.eg.db", "customProDB", "GenomicRanges", "tidyverse", "bio3d", "plyr", "pheatmap", "data.table")
-for(x in 1:length(libs)){
-  if(!libs[x] %in% rownames(installed.packages())){
-    library("BiocManager")
-    BiocManager::install(libs[x])
-  }
-}
+libs <- c("customProDB", "ensemblVEP", "org.Hs.eg.db", "GenomicRanges", "tidyverse", "plyr", "pheatmap", "data.table")
+
 libsLoaded <- lapply(libs,function(l){suppressMessages(library(l, character.only = TRUE))})
 
 strSplitFun <- function(input,sepn){
@@ -111,15 +106,10 @@ vcfVepAnnParseGR <- function(vcfIn, germline){
 ##create single-letter HGVS protein annotation (VEP outputs 3-letter)
 ##take vector, gsub out aa3 for aa1
 subHGVSp <- function(inVec){
-  lib <- c("bio3d")
-  loadedLib <- lapply(lib,function(l){suppressMessages(library(l, character.only = TRUE))})
 
-  aa1 <- bio3d::aa.table$aa1
+  aa1 <- c("A", "R", "N", "D", "C", "Q", "E", "G", "H", "I", "L", "K", "M", "F", "P", "S", "T", "W", "Y", "V", "X", "D", "R", "C", "C", "C", "C", "C", "C", "C", "C", "H", "G", "H", "H", "H", "H", "H", "H", "D", "K", "K", "M", "K", "M", "C", "F", "Y", "S", "T")
   ##amino acid 3 letter to gsub HGVSp
-  aa3 <- unlist(lapply(bio3d::aa.table$aa3,function(f){
-    sp <- strsplit(f,"")[[1]];
-    paste0(sp[1], tolower(sp[2]),tolower(sp[3]))
-  }))
+  aa3 <- c("Ala","Arg", "Asn", "Asp", "Cys", "Gln", "Glu", "Gly", "His", "Ile", "Leu", "Lys", "Met", "Phe", "Pro", "Ser", "Thr", "Trp", "Tyr", "Val", "Aba", "Ash", "Cir", "Cme", "Cmt", "Csd", "Cso", "Csw", "Csx", "Cym", "Cyx", "Dde", "Glh", "Hid", "Hie", "Hip", "Hsd", "Hse", "Hsp", "Ias", "Kcx", "Lyn", "Mho", "Mly", "Mse", "Ocs", "Pff", "Ptr", "Sep", "Tpo")
 
   ##include * for Ter
   aa1 <-c(aa1,"*")
@@ -167,20 +157,50 @@ GRsuperSet <- function(varList, impacts=NULL, mcolsWant=NULL, nameCallers=NULL){
   seqwant <- c(seq(from=1,to=22,by=1), "X")
 
   ##iterate over samples in callerset
-  for (x in seq_along(call1)){
-    print(paste0("Working on: ",names(call1)[x]))
+  if(length(call1) > 1){
+    for (x in seq_along(call1)){
+      print(paste0("Working on: ",names(call1)[x]))
 
-    calls1 <- call1[[x]]
-    calls2 <- call2[[x]]
+      calls1 <- call1[[x]]
+      calls2 <- call2[[x]]
+
+      ##test all wanted mcols exist, rename if "VF" not "AF" (Pisces)
+      for(y in 1:2){
+        if(length(mcolsWant[mcolsWant %in% names(mcols(call1[[y]]))]) != length(mcolsWant)){
+          gsub("VF","AF", names(mcols(call1[[y]])))
+        }
+        if(length(mcolsWant[mcolsWant %in% names(mcols(call2[[y]]))]) != length(mcolsWant)){
+          gsub("VF","AF", names(mcols(call2[[y]])))
+        }
+      }
+      calls1$HGVSp1 <- subHGVSp(calls1$HGVSp)
+      calls2$HGVSp1 <- subHGVSp(calls2$HGVSp)
+
+      ##sets of call1, 2 and the difference
+      gr11 <- calls1[calls1$IMPACT %in% impacts, names(mcols(calls1)) %in% mcolsWant]
+      gr22 <- calls2[calls2$IMPACT %in% impacts, names(mcols(calls2)) %in% mcolsWant]
+      gr12 <- suppressWarnings(setdiff(gr22, gr11))
+
+      if(length(gr11)!=0 & length(gr12)!=0){
+        mcols(gr11) <- mcols(gr11)[,mcolsWant]
+        mcols(gr12) <- mcols(gr12)[,mcolsWant]
+      }
+
+      ##add 1 and difference (the superset of variants)
+      GRsuper[[x]] <- suppressWarnings(c(gr11,gr12))
+    }
+  }
+  else{
+    ##only one sample, return this
+    calls1 <- call1[[1]]
+    calls2 <- call2[[1]]
 
     ##test all wanted mcols exist, rename if "VF" not "AF" (Pisces)
-    for(y in 1:2){
-      if(length(mcolsWant[mcolsWant %in% names(mcols(call1[[y]]))]) != length(mcolsWant)){
-        gsub("VF","AF", names(mcols(call1[[y]])))
-      }
-      if(length(mcolsWant[mcolsWant %in% names(mcols(call2[[y]]))]) != length(mcolsWant)){
-        gsub("VF","AF", names(mcols(call2[[y]])))
-      }
+    if(length(mcolsWant[mcolsWant %in% names(mcols(call1[[1]]))]) != length(mcolsWant)){
+        gsub("VF","AF", names(mcols(call1[[1]])))
+    }
+    if(length(mcolsWant[mcolsWant %in% names(mcols(call2[[1]]))]) != length(mcolsWant)){
+        gsub("VF","AF", names(mcols(call2[[1]])))
     }
     calls1$HGVSp1 <- subHGVSp(calls1$HGVSp)
     calls2$HGVSp1 <- subHGVSp(calls2$HGVSp)
@@ -196,35 +216,101 @@ GRsuperSet <- function(varList, impacts=NULL, mcolsWant=NULL, nameCallers=NULL){
     }
 
     ##add 1 and difference (the superset of variants)
-    GRsuper[[x]] <- suppressWarnings(c(gr11,gr12))
+    GRsuper[[1]] <- suppressWarnings(c(gr11,gr12))
   }
   return(GRsuper)
 }
 
 ##find consensus in at least two callers, therefore in GRsuper
 ##this produces a set of positions to plot
-atLeastTwo <- function(varList, GRsuper, tag, tmb=NULL){
+atLeastTwo <- function(varList, GRsuper, taga, tmb=NULL){
 
-  ##run TMB?
-  if(is.null(tmb)){tmb <- "snv"}
+  ##set TMB
+  if(is.null(tmb)){
+    tmb <- "null"
+  }
 
   ##set vars
   callers <- names(varList)
   samples <- names(varList[[1]])
 
   ##iterate over list of callers
-  GRplots <- lapply(seq_along(samples), function(x){
+  if(length(samples) > 1){
+    GRplots <- lapply(seq_along(samples), function(x){
 
-      sample <- samples[x]
-      print(paste0("Working on: ",sample))
+        sample <- samples[x]
+        print(paste0("Working on: ",sample))
+
+        ##all possible combinations of intersects of callers
+        ##output to clean GR
+        upl <- GRanges()
+        upl1 <- apply(t(combn(length(callers), m=2)), 1, function(xx){
+          print(paste(callers[xx[1]]," vs. ",callers[xx[2]]))
+          gr1 <- varList[[names(varList)[xx[1]]]][[x]]
+          gr2 <- varList[[names(varList)[xx[2]]]][[x]]
+          gri <- suppressWarnings(GenomicRanges::intersect(gr1,gr2))
+          upl <- suppressWarnings(c(upl, gri))
+        })
+        upl2 <- upl1[[1]]
+        if(length(upl1) > 1){
+          for(xx in 2:length(upl1)){
+            upl2 <- suppressWarnings(c(upl2, upl1[[xx]]))
+          }
+          GRplot <- suppressWarnings(GRsuper[[x]][GRsuper[[x]] %in% unique(upl2)])
+        }
+        if(length(upl1) == 1){
+          GRplot <- intersect(GRsuper[[x]], unique(upl2))
+        }
+
+        #TMB
+        fileOut <- paste0(sample, ".", taga, ".consensus.tab")
+        vcfOut <- paste0(sample, ".", taga, ".pcgr.all.tab.vcf")
+
+        if(tmb == "snv"){
+            tmbOut <- exomeTumourMutationBurden(GRplot)
+            fileOut <- paste0(sample, ".", taga, ".TMB_", tmbOut, "_SNV-Mb.consensus.tab")
+        }
+        write.table(GRplot, file=fileOut, quote=F, row=F, col=T, sep="\t")
+
+        ##VCF output
+        ###CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT
+        ##1	33238563	.	G	A	.	PASS	TVAF=0.145833333333;TDP=49;	GT:DPC:DPT:ADC:ADT	0/1:.:DP:.,.:AD,AD.1
+        vcfGRplot <- as_tibble(as.data.frame(GRplot), rownames="r") %>%
+          tidyr::separate(r,
+                          c("#CHROM", "POS", "REF", "ALT"),
+                          sep = "[:_\\/]") %>%
+          dplyr::rename(AD1='AD.1') %>%
+          dplyr::mutate(POS = as.integer(POS),
+                        ID = ".",
+                        QUAL = ".",
+                        INFO = ".",
+                        FILTER = "PASS",
+                        FORMAT = "GT:DPC:DPT:ADC:ADT",
+                        ADSUM = as.numeric(AD) + as.numeric(AD1),
+                        sampleID = paste0("0/1:.:",
+                                                      ADSUM,
+                                                      ":.,.:",
+                                                      AD,",",AD1)) %>%
+          dplyr::select('#CHROM', POS, ID, REF, ALT, QUAL, FILTER, INFO,  FORMAT, sampleID) %>%
+          dplyr::rename(!!sample:="sampleID")
+
+        write_tsv(path=vcfOut, vcfGRplot)
+        return(GRplot)
+      })
+      names(GRplots) <- samples
+    }
+    else{
+      ##only one sample
+      sample <- samples[1]
+      print(paste0("Only one sample: ",sample))
 
       ##all possible combinations of intersects of callers
       ##output to clean GR
       upl <- GRanges()
       upl1 <- apply(t(combn(length(callers), m=2)), 1, function(xx){
         print(paste(callers[xx[1]]," vs. ",callers[xx[2]]))
-        gr1 <- varList[[names(varList)[xx[1]]]][[x]]
-        gr2 <- varList[[names(varList)[xx[2]]]][[x]]
+        gr1 <- varList[[names(varList)[xx[1]]]][[1]]
+        gr2 <- varList[[names(varList)[xx[2]]]][[1]]
         gri <- suppressWarnings(GenomicRanges::intersect(gr1,gr2))
         upl <- suppressWarnings(c(upl, gri))
       })
@@ -233,26 +319,26 @@ atLeastTwo <- function(varList, GRsuper, tag, tmb=NULL){
         for(xx in 2:length(upl1)){
           upl2 <- suppressWarnings(c(upl2, upl1[[xx]]))
         }
-        GRplot <- suppressWarnings(GRsuper[[x]][GRsuper[[x]] %in% unique(upl2)])
+        GRplots <- suppressWarnings(GRsuper[[1]][GRsuper[[1]] %in% unique(upl2)])
       }
       if(length(upl1) == 1){
-        GRplot <- intersect(GRsuper[[x]], unique(upl2))
+        GRplots <- intersect(GRsuper[[1]], unique(upl2))
       }
 
       #TMB
-      fileOut <- paste0(sample,".",tag,".consensus.tab")
-      vcfOut <- paste0(sample,".",tag,".pcgr.all.tab.vcf")
+      fileOut <- paste0(sample,".",taga,".consensus.tab")
+      vcfOut <- paste0(sample,".",taga,".pcgr.all.tab.vcf")
 
       if(tmb == "snv"){
           tmbOut <- exomeTumourMutationBurden(GRplot)
-          fileOut <- paste0(sample,".",tag,".TMB_",tmbOut,"_SNV-Mb.consensus.tab")
-        }
-      write.table(GRplot,file=fileOut,quote=F,row=F,col=T,sep="\t")
+          fileOut <- paste0(sample,".",taga,".TMB_",tmbOut,"_SNV-Mb.consensus.tab")
+      }
+      write.table(GRplots, file=fileOut, quote=F, row=F, col=T, sep="\t")
 
       ##VCF output
       ###CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT
       ##1	33238563	.	G	A	.	PASS	TVAF=0.145833333333;TDP=49;	GT:DPC:DPT:ADC:ADT	0/1:.:DP:.,.:AD,AD.1
-      vcfGRplot <- as_tibble(as.data.frame(GRplot), rownames="r") %>%
+      vcfGRplots <- as_tibble(as.data.frame(GRplots), rownames="r") %>%
         tidyr::separate(r,
                         c("#CHROM", "POS", "REF", "ALT"),
                         sep = "[:_\\/]") %>%
@@ -271,17 +357,14 @@ atLeastTwo <- function(varList, GRsuper, tag, tmb=NULL){
         dplyr::select('#CHROM', POS, ID, REF, ALT, QUAL, FILTER, INFO,  FORMAT, sampleID) %>%
         dplyr::rename(!!sample:="sampleID")
 
-      write_tsv(path=vcfOut, vcfGRplot)
-      return(GRplot)
-    })
-
-    names(GRplots) <- samples
-    return(GRplots)
+      write_tsv(path=vcfOut, vcfGRplots)
+    }
+  return(GRplots)
 }
 
 ##function to return overlapping variants for all samples
 ##also write VCF for PCGR based on example BRCA VCF from Github
-writeConsensusAll <- function(plotList, plotDF, tag, includedOrder=NULL, cons=NULL){
+writeConsensusAll <- function(plotList, plotDF, taga, includedOrder=NULL, cons=NULL){
 
   if(is.null(cons)){
     print("Require 'cons=c(\"consensus\", \"not_cons\")' to determine output type...")
@@ -313,14 +396,14 @@ writeConsensusAll <- function(plotList, plotDF, tag, includedOrder=NULL, cons=NU
 
     if(dim(outDF)[1] != 0){
       ##write output
-      fileOut <- paste0(tag,".", cons, ".tab")
+      fileOut <- paste0(taga,".", cons, ".tab")
       write.table(outDF, file=fileOut, quote=F, row=F, col=T, sep="\t")
     }
   }
 }
 
 ##create two plots: all consensus, those in 2+ samples
-plotConsensusList <- function(plotList, rawList, tag, includedOrder=NULL){
+plotConsensusList <- function(plotList, rawList, taga, includedOrder=NULL){
 
   ##remove hyphens
   samples <- gsub("-","_",names(plotList))
@@ -398,8 +481,8 @@ plotConsensusList <- function(plotList, rawList, tag, includedOrder=NULL){
   plotDF2 <- plotDForder[!rownames(plotDForder) %in% names(notoVec2), includedOrder]
 
   ##write out those in plotDF
-  writeConsensusAll(plotList=plotList, plotDF=plotDF1, tag=tag, includedOrder=includedOrder, cons="consensus")
-  writeConsensusAll(plotList=plotList, plotDF=plotDF2, tag=tag, includedOrder=includedOrder, cons="all")
+  writeConsensusAll(plotList=plotList, plotDF=plotDF1, taga=taga, includedOrder=includedOrder, cons="consensus")
+  writeConsensusAll(plotList=plotList, plotDF=plotDF2, taga=taga, includedOrder=includedOrder, cons="all")
 
   ##ordering
   plotDF1$labels <- rownames(plotDF1)
@@ -449,7 +532,7 @@ plotConsensusList <- function(plotList, rawList, tag, includedOrder=NULL){
         plotLabels <- rownames(plotVec[[pl]])
       }
 
-      pdf(paste0(tag,".",plotTag[[pl]],".pdf"),onefile=F)
+      pdf(paste0(taga,".",plotTag[[pl]],".pdf"),onefile=F)
       pheatmap(plotVec[[pl]][,c(1:length(includedOrder))],
          breaks=seq(from=0,to=0.5,length.out=101),
          color=colz(100),
@@ -469,16 +552,16 @@ plotConsensusList <- function(plotList, rawList, tag, includedOrder=NULL){
   }
 }
 
-plotConsensusSingle <- function(plotList, rawList, tag, includedOrder=NULL){
+plotConsensusSingle <- function(plotList, rawList, taga, includedOrder=NULL){
 
   ##remove hyphens
-  samples <- gsub("-","_",names(plotList))
+  sample <- names(plotList)[1]
 
   ##combined set of all samples
-  combGR <- suppressWarnings(unique(do.call("c", unname(plotList))))
+  combGR <- suppressWarnings(unique(plotList))
   seqlevels(combGR) <- sort(seqlevels(combGR))
   combGR <- sort(combGR)
-  combDF <- as.data.frame(combGR)
+  combDF <- as.data.frame(as.data.table(combGR))
 
   ##labels for plot
   hgvsp <- unlist(lapply(combGR$HGVSp1,function(f){
@@ -505,29 +588,24 @@ plotConsensusSingle <- function(plotList, rawList, tag, includedOrder=NULL){
     }))
   }
   plotDFrawout <- rawAFs(rawList)
-  if(length(warnings())>1){
+  if(length(warnings())>=1){
     plotDFrawout <- rawAFs(rawList)
   }
   colnames(plotDFrawout) <- unlist(lapply(names(rawList),function(f){
-    paste(f,samples,sep=".")
+    paste(f,sample,sep=".")
   }))
-  plotDFrawout <- do.call(cbind,lapply(samples, function(ss){
+  plotDFrawout <- do.call(cbind,lapply(sample, function(ss){
     apply(plotDFrawout[,grep(ss, colnames(plotDFrawout))],1,max)
   }))
 
   plotDFrawout <- as.data.frame(plotDFrawout)
-  colnames(plotDFrawout) <- samples
+  colnames(plotDFrawout) <- sample
   rownames(plotDFrawout) <- uniqLabels
 
   ##ordering
   plotDFordered <- as_tibble(plotDFrawout, rownames="row") %>%
                    dplyr::arrange(.[[2]]) %>%
                    base::as.data.frame()
-
-  ##exit if no variants
-  if(dim(plotDFordered)[1] == 0){
-    print("No shared variants found, exiting")
-  }
 
   if(dim(plotDFordered)[1] != 0){
     plotVec <- data.frame(row.names=plotDFordered[,1],
@@ -545,7 +623,7 @@ plotConsensusSingle <- function(plotList, rawList, tag, includedOrder=NULL){
       plotLabels <- rownames(plotVec)
     }
 
-    pdf(paste0(tag,".",plotTag,".consensus.onlyOverlap.pdf"),onefile=F)
+    pdf(paste0(taga,".",plotTag,".consensus.onlyOverlap.pdf"),onefile=F)
     pheatmap(plotVec,
        breaks=seq(from=0,to=0.5,length.out=101),
        color=colz(100),
@@ -556,7 +634,7 @@ plotConsensusSingle <- function(plotList, rawList, tag, includedOrder=NULL){
        legend=TRUE,
        fontsize_row=row_fontsize,
        labels_row=plotLabels,
-       labels_col=tag,
+       labels_col=taga,
        border_color="lightgrey"
     )
     dev.off()

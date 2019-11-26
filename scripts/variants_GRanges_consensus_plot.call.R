@@ -8,9 +8,8 @@
 ##[1] <- functions file
 ##[2] <- GERMLINE = ${params.germline}
 ##[3] <- VEPVCFPATTERN = $vartype".pass.vep"
-##[4] <- TAG = ${params.runID}
-##[5] <- INCLUDEDORDER, if more than 1 sample define order for plots
-##[6] <- NAMECALLERS, variant callers to use in superset, 2 and only 2 required!
+##[4] <- INCLUDEDORDER, if more than 1 sample define order for plots
+##[5] <- NAMECALLERS, variant callers to use in superset, 2 and only 2 required!
 
 options(stringAsFactors=FALSE)
 args <- commandArgs(trailingOnly = TRUE)
@@ -24,16 +23,6 @@ GERMLINE <- args[2]
 ##raw VCF must be *raw.vcf
 VEPVCFPATTERN <- args[3]
 RAWVCFPATTERN <- "raw.vcf"
-
-##string to tag output files
-TAG <- args[4] -> tag
-
-if(length(args)==6){
-  NAMECALLERS <- strSplitVec(args[6],",")[,1]
-}
-if(length(args)<6){
-  NAMECALLERS <- NULL
-}
 
 ##parse VCFs
 ##all should exist in current dir, all output to same dir
@@ -50,9 +39,9 @@ vcfExt <- gsub("-","_",
                     collapse="."))
 
 ##create order from vcfList
-if(length(args)==5){
-  if(length(args[5][grep("\\,", args[5])])>0){
-    INCLUDEDORDER <- strSplitVec(args[5],",")[,1] ##comma delim string
+if(length(args)==4){
+  if(length(args[4][grep("\\,", args[4])])>0){
+    INCLUDEDORDER <- strSplitVec(args[4],",")[,1] ##comma delim string
   }
   else{
     INCLUDEDORDER <- vcfList %>%
@@ -125,9 +114,7 @@ varList <- get(loadedGR[[vcfExt]])
 
 ##callers, samples used
 callers <- names(varList)
-if(is.null(NAMECALLERS)){
-  NAMECALLERS <- c(callers[1], callers[2])
-}
+NAMECALLERS <- c(callers[1], callers[2])
 samples <- names(varList[[1]])
 
 ##ensure some variants in each sample to check on
@@ -144,19 +131,21 @@ if(all(anyVars > 0)){
   ##get list to plot from
   plotList <- atLeastTwo(varList,
                          GRsuper,
-                         tag=paste0(tag,".",VEPVCFPATTERN,".HM"))
+                         taga="HM")
 
   ##plot
-  if(length(plotList)>1){
-    if(length(plotList[[1]])!=0 & length(plotList[[2]])!=0){
-      plotConsensusList(plotList, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".HM"), includedOrder=INCLUDEDORDER)
-    }
-    if(length(plotList[[1]])==0 & length(plotList[[2]])==0){
-      print("No variants returned at HM, support across callers lacking")
-    }
+  if(!is.list(plotList)){
+    plotConsensusSingle(plotList, rawList, taga="HM")
   }
-  if(length(plotList)==1){
-    plotConsensusSingle(plotList, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".HM"))
+  if(is.list(plotList)){
+    if(length(plotList)>1){
+      if(length(plotList[[1]])!=0 & length(plotList[[2]])!=0){
+        plotConsensusList(plotList, rawList, taga="HM", includedOrder=INCLUDEDORDER)
+      }
+      if(length(plotList[[1]])==0 & length(plotList[[2]])==0){
+        print("No variants returned at HM, support across callers lacking")
+      }
+    }
   }
 
   ##run to get all impacts, print but not plot
@@ -164,19 +153,19 @@ if(all(anyVars > 0)){
   GRsuperALL <- GRsuperSet(varList, impacts=c("HIGH","MODERATE","MODIFIER","LOW"), nameCallers=NAMECALLERS)
 
   ##get list to plot from
-  plotListAll <- atLeastTwo(varList, GRsuperALL, tag=paste0(tag,".",VEPVCFPATTERN,".ALL"), tmb="snv")
+  plotListAll <- atLeastTwo(varList, GRsuperALL, taga="ALL")
 
   ##plot
-  if(length(plotListAll)>1){
+  if(is.list(plotListAll)){
     if(length(plotListAll[[1]])!=0 & length(plotListAll[[2]])!=0){
-      plotConsensusList(plotListAll, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".ALL"), includedOrder=INCLUDEDORDER)
+      plotConsensusList(plotListAll, rawList, taga="ALL", includedOrder=INCLUDEDORDER)
     }
     if(length(plotListAll[[1]])==0 & length(plotListAll[[2]])==0){
       print("No variants returned at ALL, support across callers lacking")
     }
   }
-  if(length(plotListAll)==1){
-    plotConsensusSingle(plotListAll, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".ALL"))
+  if(!is.list(plotListAll)){
+    plotConsensusSingle(plotListAll, rawList, taga="ALL")
   }
 }
 if(all(anyVars == 0)){
