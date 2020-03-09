@@ -1,0 +1,20 @@
+name: somaticVariantConsensus
+channels:
+  - conda-forge
+  - r
+  - pcgr
+  - bioconda
+  - anaconda
+  - defaults
+dependencies:
+  - bioconductor-customprodb
+  - bioconductor-ensembldb
+  - bioconductor-ensemblvep
+  - bioconductor-genomicranges
+  - bioconductor-org.hs.eg.db
+  - libiconv=1.15
+  - r-data.table
+  - r-plyr
+  - r-dplyr
+  - r-pheatmap
+  - r-tidyverse

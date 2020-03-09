@@ -5,7 +5,7 @@
 ### How to:
 
 **Required Inputs**
-- VCFs (at least two or the method is pointless) annotated by VEP. Flags for succesful run below, NB to define those input variables:
+- VCFs (at least two or the method is pointless) annotated by VEP using below flags:
  ```
  vep --dir_cache $CACHEDIR \
    --offline \
@@ -30,32 +30,24 @@
    --force_overwrite \
    --verbose
  ```
-- R libraries. Install below, into the .libPath() location that you then give the scripts herein. As I use PBS, library paths have been an issue so I now set specifically. NB that NExtFlow with Singularity is coming soon, so this is WIP and provisional
+- R libraries. Install as below, or use the Singularity container
  ```
- #set 'ask=FALSE' and then supply your local territory
- #alternatively, skip next line and lapply's and install 'by-hand' to allow updating a/s/n of dependencies
- update(ask=FALSE)
- 
- #bioconductor packages
- biocLibs <- c("bio3d",
-	   "customProDB", 
-	   "ensemblVEP", 
-	   "GenomicRanges", 
-	   "org.Hs.eg.db")
- source("https://bioconductor.org/biocLite.R")
- lapply(biocLibs,biocLite())
- 
- #CRAN packages
- cranLibs <- c("bio3d",
- 	   "data.table", 
- 	   "pheatmap",
-	   "tidyverse")
- lapply(cranLibs,install.packages(dependencies=TRUE))
+ library("BiocManager")
+
+ #packages
+ libs <- c("customProDB",
+      	   "ensemblVEP",
+      	   "GenomicRanges",
+      	   "org.Hs.eg.db",
+           "data.table",
+       	   "pheatmap",
+      	   "tidyverse")
+
+ lapply(libs, BiocManager::install(dependencies = TRUE, update = TRUE, ask = FALSE))
  ```
 
 - Variables for R scripts
  ```
- LIBPATH = <your R .libPaths() result from above installs> 
  CALLDIR = <directory where your VCFs reside, NB name of this dir is used to tag filenames (best use case: dir named after caller>
  SCRIPTDIR = <where you put the scripts> from the ./scripts of this repo
  WORKDIR = <directory in which to save RData GRanges of variant calls used in rescue, plotting>
@@ -70,7 +62,7 @@
 - Make RData containing GRanges of multiple samples from VEP-annotated and raw VCFs
  Following variant calling with CallerX which is in directory structure: /data/project/analysis/WGS/calls/CallerX
  ```
- Rscript --vanilla $SCRIPTDIR/vepVCF_to_GRangesRData.caller.R \
+ Rscript --vanilla $SCRIPTDIR/variants_GRanges_consensus_plot.func.R \
     $RLIBPATH \
     $SCRIPTDIR \
     $CALLDIR \
@@ -80,7 +72,7 @@
     $RAWVCFPATTERN
  ```
  This outputs an RData file containing calls for all samples with the $VEPVCFPATTERN, $RAWVCFPATTERN (e.g. sets of files with extensions 'vep90.snv.vcf', 'raw.snv.vcf' will be parsed into GRanges and saved); these are saved to $WORKDIR
- 
+
  N.B. that the actual format of the RData is a list of GRanges (NOT GRangesList), so access is as per functions herein, read the code to see how it is performed.
 
 - Rescue somatic calls, plot
@@ -97,7 +89,7 @@
 
 **Output**
 - RData GRanges objects
- Given three samples named Tumour, Recurrence, Metastasis; SNVs called with MuTect2 and Strelka2, you have 12 VCFs as input: Tumour.MuTect2.snv.raw.vcf, Tumour.Strelka2.snv.raw.vcf, Tumour.MuTect2.snv.vep90.vcf, etc. 
+ Given three samples named Tumour, Recurrence, Metastasis; SNVs called with MuTect2 and Strelka2, you have 12 VCFs as input: Tumour.MuTect2.snv.raw.vcf, Tumour.Strelka2.snv.raw.vcf, Tumour.MuTect2.snv.vep90.vcf, etc.
  There are four RData made in the first instance by vepVCF_to_GRangesRData.caller.R: MuTect2.snv.raw.RData, MuTect2.snv.vep90.RData, Strelka2.snv.raw.RData, Strelka2.snv.vep90.RData, each is set up internally like this:
  ```
  > MuTect2_GRanges <- get(load("MuTect2.vep90.RData"))
@@ -119,10 +111,10 @@
  Idea was to represent all mutations shared between any samples, and to visualise the extent of variants across all samples. NB samples can be removed by excluding from $INCLUDEDORDER.
  Examples:
  [only-shared](https://github.com/brucemoran/rescueSomaticVariantCalls/blob/master/images/HM.snv.only-shared.consensus.pdf)
- NB the shared *PTEN* and *RB1* mutations (common across high-grade ovarian disease) 
+ NB the shared *PTEN* and *RB1* mutations (common across high-grade ovarian disease)
  [private-shared](https://github.com/brucemoran/rescueSomaticVariantCalls/blob/master/images/HM.snv.private-shared.consensus.pdf)
  NB the extent of mutation in 'Normal' which was taken following 3 cycles of carboplatin, a potent mutagen
 
 **To-do**
- - [ ] Scale bar for private-shared to show extent. 
+ - [ ] Scale bar for private-shared to show extent.
  - [ ] Print TMB values to private-shared.

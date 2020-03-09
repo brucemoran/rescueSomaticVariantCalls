@@ -17,6 +17,66 @@ strSplitVec <- function(inVec,sepn){
 ##parse VCF into GR, for use on un-annotated VCFs
 source("https://raw.githubusercontent.com/brucemoran/R/master/functions/GRanges/vcfVepAnnParse2GR.func.R")
 
+# #parse VEP annotated VCF into GR, uses CANONICAL transcript
+# vcfVepAnnParseGR <- function(vcfIn, germline){
+#
+#   vcf <- readVcf(vcfIn)
+#   if(dim(vcf)[1] != 0){
+#     gr <- suppressWarnings(InputVcf(vcfIn))
+#
+#     ##parse info
+#     infor <- info(header(vcf))
+#
+#     ##VEP annotation naming
+#     annNames <- unlist(strSplitFun(infor[rownames(infor)=="ANN",]$Description,"\\|"))
+#
+#     ##somatic
+#     if(!is.null(germline)){
+#       somName <- names(gr)[names(gr)!=germline]
+#     }
+#     if(is.null(germline)){
+#       somName <- names(gr)
+#     }
+#     print(paste0("Working on: ",somName))
+#     som <- gr[[somName]]
+#     seqinfo(som) <- seqinfo(vcf)[seqlevels(som)]
+#
+#     ##ensure an AF is there, pisces has VF instead (thanks pisces dev=D)
+#     if(! "AF" %in% names(mcols(som))){
+#       AD <- as.numeric(unlist(mcols(som)["AD"]))
+#       AD1 <- as.numeric(unlist(mcols(som)["AD.1"]))
+#       tot <- AD+AD1
+#       mcols(som)$AF <- AD1/tot
+#     }
+#
+#     ##annotation by CANONICAL, and add to mcols
+#     somAnnDf <- t(as.data.frame(lapply(strSplitFun(som$ANN,"\\|"),function(ff){
+#       if(ff[annNames=="CANONICAL"]=="YES"){
+#         if(is.null(ff)){ff<-rep("",length(annNames))}
+#         if(length(ff)!=length(annNames)){
+#           lengExtra <- length(annNames)-length(ff)
+#           ff<-c(ff,rep("",lengExtra))}
+#         return(ff)}
+#         else{
+#           return(rep("",length(annNames)))
+#         }
+#       })))
+#     colnames(somAnnDf) <- annNames
+#
+#     if(sum(dim(somAnnDf)) != 0){
+#       values(som) <- cbind(as.data.frame(mcols(som)),somAnnDf)
+#       som$ANN <- NULL
+#     }
+#     som <-unique(som)
+#
+#     return(som)
+#   }
+#   else{
+#     print("No variants found")
+#     return(GRanges())
+#   }
+# }
+
 ##create single-letter HGVS protein annotation (VEP outputs 3-letter)
 ##take vector, gsub out aa3 for aa1
 subHGVSp <- function(inVec){
@@ -46,16 +106,16 @@ subHGVSp <- function(inVec){
 }
 
 ##create GRsupersets from list of variants
-##varList = nested list of [[caller]][[samples1..n]]
+#varList = nested list of [[caller]][[samples1..n]]
+##NB hardcode via =NULL
 GRsuperSet <- function(varList, impacts=NULL, mcolsWant=NULL, nameCallers=NULL){
 
   ##set NULL vars
   if(is.null(impacts)){impacts <- c("HIGH","MODERATE")}
   if(is.null(mcolsWant)){mcolsWant <- c("AD", "AD.1", "AF", "Consequence", "IMPACT", "SYMBOL", "HGVSc", "HGVSp", "CLIN_SIG")}
-  if(is.null(nameCallers)){nameCallers <- unique(c(names(varList)[1], names(varList)[2])) }
 
   if(length(nameCallers) != 2){
-    print("Require 2 callers, no more and no less!")
+    print("Require only 2 callers, no more and no less!")
     exit;
   }
 
@@ -63,19 +123,18 @@ GRsuperSet <- function(varList, impacts=NULL, mcolsWant=NULL, nameCallers=NULL){
   GRsuper <- as.list(names(varList[[1]]))
   callerNames <- names(varList)
 
-  ##read first entry and take first 2 callers
-  call1 <-
+  ##read first entry
+  call1 <- varList[[nameCallers[1]]]
   call2 <- varList[[nameCallers[2]]]
 
   #exclude MT, GL
   seqwant <- c(seq(from=1,to=22,by=1), "X")
 
   ##iterate over samples in callerset
-  if(length(varList[[nameCallers[1]]]) > 1){
+  if(length(call1) > 1){
     for (x in seq_along(call1)){
       print(paste0("Working on: ",names(call1)[x]))
 
-      ##2 callers for sample_x
       calls1 <- call1[[x]]
       calls2 <- call2[[x]]
 
@@ -317,6 +376,23 @@ writeConsensusAll <- function(plotList, plotDF, taga, includedOrder=NULL, cons=N
   }
 }
 
+##generate raw allele ffrequencies from list of GRanges
+rawAFs <- function(rawList, combGR){
+  ##ff contians all GR of each sample for the caller
+    as.data.frame(lapply(rawList,function(ff){
+      afs <- rep(as.numeric(0), length(combGR))
+      ##per sample, test which variants are found in entire
+      lapply(seq_along(ff), function(ffi){
+        fff <- ff[[ffi]]
+        seqlevels(fff) <- sort(seqlevels(fff))
+        ffs <- sort(fff)
+        ffsi <- ffs[ffs %in% combGR]
+        afs[combGR %in% ffsi] <- as.numeric(mcols(ffsi)$AF)
+        return(afs)
+      })
+    }))
+}
+
 ##create two plots: all consensus, those in 2+ samples
 plotConsensusList <- function(plotList, rawList, taga, includedOrder=NULL){
 
@@ -347,21 +423,10 @@ plotConsensusList <- function(plotList, rawList, taga, includedOrder=NULL){
   ##take those positions, then query raw calls
   ##allows 'rescue' of those falling out from arbitrary filters
   ##enough support previously to allow re-entry
-  rawAFs <- function(rawList){
-    as.data.frame(lapply(rawList,function(ff){
-      afs <- rep(0,length(combGR))
-      lapply(ff,function(fff){
-        seqlevels(fff) <- sort(seqlevels(fff))
-        ffs <- sort(fff)
-        ffsi <- ffs[ffs %in% combGR]
-        afs[combGR %in% ffsi] <- as.numeric(mcols(ffsi)$AF)
-        return(afs)
-      })
-    }))
-  }
-  plotDFrawout <- rawAFs(rawList)
+  plotDFrawout <- rawAFs(rawList, combGR)
+
   if(length(warnings())>1){
-    plotDFrawout <- rawAFs(rawList)
+    plotDFrawout <- rawAFs(rawList, combGR)
   }
   colnames(plotDFrawout) <- unlist(lapply(names(rawList),function(f){
     paste(f,samples,sep=".")
@@ -554,4 +619,23 @@ plotConsensusSingle <- function(plotList, rawList, taga, includedOrder=NULL){
     )
     dev.off()
   }
+}
+
+exomeTumourMutationBurden <- function(GRplot){
+
+  ##get exome for Illumina Nextera Rapid
+  exomeBed <- fread("https://support.illumina.com/content/dam/illumina-support/documents/documentation/chemistry_documentation/samplepreps_nextera/nexterarapidcapture/nexterarapidcapture_exome_targetedregions_v1.2.bed", showProgress=FALSE, data.table=FALSE)
+
+  ##triage chr tag, add header
+  exomeBed[,1] <- gsub("chr","",exomeBed[,1])
+  colnames(exomeBed) <- c("seqname", "start", "end")
+  exomeGR <- makeGRangesFromDataFrame(exomeBed, ignore.strand=TRUE)
+  exomeSize <- sum(width(exomeGR))/1000000
+
+  ##overlap with input
+  hits <- as.data.frame(findOverlaps(GRplot, exomeGR))
+  ##output
+  GRplotExome <- GRplot[hits$queryHits]
+  TMB <- round(length(GRplotExome)/exomeSize,digits=1)
+  return(TMB)
 }
