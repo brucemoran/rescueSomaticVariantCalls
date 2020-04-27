@@ -13,25 +13,25 @@
 ##[6] <- NAMECALLERS, variant callers to use in superset, 2 and only 2 required!
 
 options(stringAsFactors=FALSE)
-args <- commandArgs(trailingOnly = TRUE)
+argsIn <- commandArgs(trailingOnly = TRUE)
 ##if defined, used R_LIB_PATHS
-source(args[1])
+source(argsIn[1])
 
 ##germline sample ID
-TUMOURPATTERN <- args[2]
+TUMOURPATTERN <- argsIn[2]
 
 ##VEP vcf pattern
 ##raw VCF must be *raw.vcf
-VEPVCFPATTERN <- args[3]
+VEPVCFPATTERN <- argsIn[3]
 RAWVCFPATTERN <- "raw.vcf"
 
 ##string to tag output files
-TAG <- args[4] -> tag
+TAG <- argsIn[4] -> tag
 
-if(length(args)==6){
-  NAMECALLERS <- strSplitVec(args[6],",")[,1]
+if(length(argsIn)==6){
+  NAMECALLERS <- strSplitVec(argsIn[6],",")[,1]
 }
-if(length(args)<6){
+if(length(argsIn)<6){
   NAMECALLERS <- NULL
 }
 
@@ -42,7 +42,7 @@ vcfList <- vcfVec[grep(paste0(VEPVCFPATTERN,"$"),vcfVec)]
 vcfList <- vcfList[grep(paste0(TUMOURPATTERN),vcfList)]
 
 rawVec <- dir(pattern=RAWVCFPATTERN)
-rawList <- rawVec[grep(paste0(RAWVCFPATTERN,"$"),rawVec)]
+rawList <- grep(TUMOURPATTERN, rawVec[grep(paste0(RAWVCFPATTERN,"$"),rawVec)], value=TRUE)
 inputList <- list(vcfList, rawList)
 vcfExt <- gsub("-","_",
                paste(strSplitVec(
@@ -52,9 +52,9 @@ vcfExt <- gsub("-","_",
                     collapse="."))
 
 ##create order from vcfList
-if(length(args)==5){
-  if(length(args[5][grep("\\,", args[5])])>0){
-    INCLUDEDORDER <- strSplitVec(args[5],",")[,1] ##comma delim string
+if(length(argsIn)==5){
+  if(length(argsIn[5][grep("\\,", argsIn[5])])>0){
+    INCLUDEDORDER <- strSplitVec(argsIn[5],",")[,1] ##comma delim string
   }
   else{
     INCLUDEDORDER <- vcfList %>%
@@ -62,7 +62,7 @@ if(length(args)==5){
                      unlist() %>% unique()
   }
 }
-if(length(args)<5){
+if(length(argsIn)<5){
   INCLUDEDORDER <- vcfList %>%
                    lapply(.,function(f){strsplit(f,"\\.")[[1]][1]}) %>%
                    unlist() %>% unique()
@@ -144,48 +144,27 @@ for(x in 1:length(varList)){
   anyVars <- c(anyVars, length(varList[[x]][[y]]))
 }
 
-if(all(anyVars > 0)){
+if(all(anyVars >= 3)){
   ##get GRanges superset per mutype
   GRsuper <- GRsuperSet(varList, nameCallers=NAMECALLERS)
 
   ##get list to plot from
-  plotList <- atLeastTwo(varList,
-                         GRsuper,
-                         tag=paste0(tag,".",VEPVCFPATTERN,".HM"))
-
-  ##plot
-  if(length(plotList)>1){
-    if(length(plotList[[1]])!=0 & length(plotList[[2]])!=0){
-      plotConsensusList(plotList, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".HM"), includedOrder=INCLUDEDORDER)
-    }
-    if(length(plotList[[1]])==0 & length(plotList[[2]])==0){
-      print("No variants returned at HM, support across callers lacking")
-    }
-  }
-  if(length(plotList)==1){
-    plotConsensusSingle(plotList, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".HM"))
-  }
+  plotList <- atLeastTwo(varList, GRsuper, taga="HM")
 
   ##run to get all impacts, print but not plot
   ##get GRanges superset per mutype
   GRsuperALL <- GRsuperSet(varList, impacts=c("HIGH","MODERATE","MODIFIER","LOW"), nameCallers=NAMECALLERS)
 
   ##get list to plot from
-  plotListAll <- atLeastTwo(varList, GRsuperALL, tag=paste0(tag,".",VEPVCFPATTERN,".ALL"), tmb="snv")
-
-  ##plot
-  if(length(plotListAll)>1){
-    if(length(plotListAll[[1]])!=0 & length(plotListAll[[2]])!=0){
-      plotConsensusList(plotListAll, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".ALL"), includedOrder=INCLUDEDORDER)
-    }
-    if(length(plotListAll[[1]])==0 & length(plotListAll[[2]])==0){
-      print("No variants returned at ALL, support across callers lacking")
-    }
-  }
-  if(length(plotListAll)==1){
-    plotConsensusSingle(plotListAll, rawList, tag=paste0(tag,".",VEPVCFPATTERN,".ALL"))
-  }
-}
-if(all(anyVars == 0)){
-  print(paste0("No variants found for: ", args[3], ", exited..."))
+  plotListAll <- atLeastTwo(varList, GRsuperALL, taga="ALL")
+} else {
+  fileOut <- paste0(samples[1],".ALL.consensus.tab")
+  vcfOut <- paste0(samples[1],".ALL.consensus.tab.pcgr.vcf")
+  fhead <- c("seqnames", "start", "end", "width", "strand", "AD", "AD.1", "AF", "Consequence", "IMPACT", "SYMBOL", "HGVSc", "HGVSp", "CLIN_SIG")
+  vhead <- data.frame("CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT", samples[1])
+  colnames(vhead) <- c("CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT", samples[1])
+  vhead <- vhead[FALSE,]
+  write.table(fhead, file=fileOut, quote=F, row=F, col=T, sep="\t")
+  write_tsv(path=vcfOut, vhead)
+  print(paste0("No variants found for: ", argsIn[3], ", exited..."))
 }

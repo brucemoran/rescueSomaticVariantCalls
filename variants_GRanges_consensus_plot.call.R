@@ -13,15 +13,15 @@
 ##[6] <- RAWVCFPATTERN, if not included, set as raw.vcf (unfiltered)
 
 options(stringAsFactors = FALSE)
-args <- commandArgs(trailingOnly = TRUE)
-source(args[1])
+argsIn <- commandArgs(trailingOnly = TRUE)
+source(argsIn[1])
 
 ##germline sample ID
-GERMLINE <- args[2]
+GERMLINE <- argsIn[2]
 
 ##VEP vcf pattern
 ##raw VCF must be *raw.vcf
-VEPVCFPATTERN <- args[3]
+VEPVCFPATTERN <- argsIn[3]
 RAWVCFPATTERN <- "raw.vcf"
 if(!is.null(argsIn[6]])){
   RAWVCFPATTERN <- argsIn[6]
@@ -42,9 +42,9 @@ vcfExt <- gsub("-","_",
                      collapse="."))
 
 ##create order from vcfList
-if(length(args)==4){
-  if(length(args[4][grep("\\,", args[4])])>0){
-    INCLUDEDORDER <- strSplitVec(args[4],",")[,1] ##comma delim string
+if(!is.null(argsIn[4])){
+  if(length(argsIn[4][grep("\\,", argsIn[4])])>0){
+    INCLUDEDORDER <- strSplitVec(argsIn[4],",")[,1]
   }
   else{
     INCLUDEDORDER <- vcfList %>%

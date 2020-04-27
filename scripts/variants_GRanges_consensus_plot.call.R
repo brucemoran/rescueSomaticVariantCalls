@@ -13,7 +13,6 @@
 
 options(stringAsFactors=FALSE)
 args <- commandArgs(trailingOnly = TRUE)
-##if defined, used R_LIB_PATHS
 source(args[1])
 
 ##germline sample ID

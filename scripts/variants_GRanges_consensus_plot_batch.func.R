@@ -168,14 +168,13 @@ GRsuperSet <- function(varList, impacts=NULL, mcolsWant=NULL, nameCallers=NULL){
     calls2 <- call2[[x]]
 
     ##test all wanted mcols exist, rename if "VF" not "AF" (Pisces)
-    for(y in 1:2){
-      if(length(mcolsWant[mcolsWant %in% names(mcols(call1[[y]]))]) != length(mcolsWant)){
+    if(length(mcolsWant[mcolsWant %in% names(mcols(call1[[1]]))]) != length(mcolsWant)){
         gsub("VF","AF", names(mcols(call1[[y]])))
-      }
-      if(length(mcolsWant[mcolsWant %in% names(mcols(call2[[y]]))]) != length(mcolsWant)){
-        gsub("VF","AF", names(mcols(call2[[y]])))
-      }
     }
+    if(length(mcolsWant[mcolsWant %in% names(mcols(call2[[1]]))]) != length(mcolsWant)){
+        gsub("VF","AF", names(mcols(call2[[y]])))
+    }
+
     calls1$HGVSp1 <- subHGVSp(calls1$HGVSp)
     calls2$HGVSp1 <- subHGVSp(calls2$HGVSp)
 
@@ -197,10 +196,7 @@ GRsuperSet <- function(varList, impacts=NULL, mcolsWant=NULL, nameCallers=NULL){
 
 ##find consensus in at least two callers, therefore in GRsuper
 ##this produces a set of positions to plot
-atLeastTwo <- function(varList, GRsuper, tag, tmb=NULL){
-
-  ##run TMB?
-  if(is.null(tmb)){tmb <- "snv"}
+atLeastTwo <- function(varList, GRsuper, taga, tmb=NULL){
 
   ##set vars
   callers <- names(varList)
@@ -233,15 +229,10 @@ atLeastTwo <- function(varList, GRsuper, tag, tmb=NULL){
         GRplot <- intersect(GRsuper[[x]], unique(upl2))
       }
 
-      #TMB
-      fileOut <- paste0(sample,".",tag,".consensus.tab")
-      vcfOut <- paste0(sample,".",tag,".pcgr.all.tab.vcf")
+      fileOut <- paste0(sample,".",taga,".consensus.tab")
+      vcfOut <- paste0(sample,".",taga,".consensus.tab.pcgr.vcf")
 
-      if(tmb == "snv"){
-          tmbOut <- exomeTumourMutationBurden(GRplot)
-          fileOut <- paste0(sample,".",tag,".TMB_",tmbOut,"_SNV-Mb.consensus.tab")
-        }
-      write.table(GRplot,file=fileOut,quote=F,row=F,col=T,sep="\t")
+      write.table(GRplot, file=fileOut, quote=F, row=F, col=T, sep="\t")
 
       ##VCF output
       ###CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT
@@ -267,12 +258,18 @@ atLeastTwo <- function(varList, GRsuper, tag, tmb=NULL){
         dplyr::rename(!!sample:="sampleID")
 
       write_tsv(path=vcfOut, vcfGRplot)
-    }
-      return(GRplot)
-    })
-
-    names(GRplots) <- samples
-    return(GRplots)
+      }
+      if(length(GRplot)==0){
+        vcfOut <- paste0(samples[1],".ALL.consensus.tab.pcgr.vcf")
+        vhead <- data.frame("CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT", samples[1])
+        colnames(vhead) <- c("CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT", samples[1])
+        vhead <- vhead[FALSE,]
+        write_tsv(path=vcfOut, vhead)
+      }
+    return(GRplot)
+  })
+  names(GRplots) <- samples
+  return(GRplots)
 }
 
 ##function to return overlapping variants for all samples
