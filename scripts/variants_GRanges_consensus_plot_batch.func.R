@@ -142,7 +142,7 @@ GRsuperSet <- function(varList, impacts=NULL, mcolsWant=NULL, nameCallers=NULL){
 
   ##set NULL vars
   if(is.null(impacts)){impacts <- c("HIGH","MODERATE")}
-  if(is.null(mcolsWant)){mcolsWant <- c("AD", "AD.1", "AF", "Consequence", "IMPACT", "SYMBOL", "HGVSc", "HGVSp", "CLIN_SIG")}
+  if(is.null(mcolsWant)){mcolsWant <- c("AD", "AD.1", "AF", "Consequence", "IMPACT", "SYMBOL", "HGVSc", "HGVSp", "CLIN_SIG", "PolyPhen", "SIFT")}
 
   if(length(nameCallers) != 2){
     print("Require only 2 callers, no more and no less!")

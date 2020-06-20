@@ -80,7 +80,7 @@ for(x in 1:2){
       }
       else{
         grList[[caller]] <- lapply(inList[grep(caller,callers)],function(f){
-          suppressWarnings(vcfVepAnnParseGR(f, GERMLINE))
+          suppressWarnings(vcfVepAnnParseGRsoma(f, GERMLINE))
         })
       }
       names(grList[[caller]]) <- samples[grep(caller,callers)]

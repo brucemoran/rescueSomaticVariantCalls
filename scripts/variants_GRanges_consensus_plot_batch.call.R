@@ -160,11 +160,14 @@ if(all(anyVars >= 3)){
 } else {
   fileOut <- paste0(samples[1],".ALL.consensus.tab")
   vcfOut <- paste0(samples[1],".ALL.consensus.tab.pcgr.vcf")
-  fhead <- c("seqnames", "start", "end", "width", "strand", "AD", "AD.1", "AF", "Consequence", "IMPACT", "SYMBOL", "HGVSc", "HGVSp", "CLIN_SIG")
+  fhead <- c("seqnames", "start", "end", "width", "strand", "AD", "AD.1", "AF", "Consequence", "IMPACT", "SYMBOL", "HGVSc", "HGVSp", "CLIN_SIG", "PolyPhen", "SIFT")
+  fout <- data.frame(as.list(fhead))
+  colnames(fout)<-fhead
+  fout <- fout[-1,]
   vhead <- data.frame("CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT", samples[1])
   colnames(vhead) <- c("CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT", samples[1])
   vhead <- vhead[FALSE,]
-  write.table(fhead, file=fileOut, quote=F, row=F, col=T, sep="\t")
+  write.table(fout, file=fileOut, quote=F, row=F, col=T, sep="\t")
   write_tsv(path=vcfOut, vhead)
   print(paste0("No variants found for: ", argsIn[3], ", exited..."))
 }
